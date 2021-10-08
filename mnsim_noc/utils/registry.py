@@ -32,7 +32,7 @@ class RegistryMeta(abc.ABCMeta):
             if not abstract_methods:
                 entry = namespace.get("NAME", name.lower())
                 setattr(cls, "NAME", entry)
-                RegistryMeta.registry_dct[table][entry] = cls
+                RegistryMeta.registry_dict[table][entry] = cls
                 LOGGER.debug(
                     "Register class {} as entry {} in table {}.".format(
                         name, entry, table
@@ -51,7 +51,6 @@ class RegistryMeta(abc.ABCMeta):
     @classmethod
     def get_class(mcs, table, name):
         try:
-            print(mcs.registry_dict)
             return mcs.all_classes(table)[name]
         except KeyError:
             raise RegistryError(

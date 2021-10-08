@@ -7,14 +7,14 @@
 @CreateTime:
     2021/10/08 17:50
 """
-from mnsim_noc.utils.log import getLogger
-from mnsim_noc.utils.registry import RegistryMeta
+from mnsim_noc.utils import getLogger, RegistryMeta
 
 class Component(object, metaclass=RegistryMeta):
     """
     component for all other parts
     init logger and other things
     """
+    __metaclass__ = RegistryMeta
     def __init__(self):
         self._logger = None
 

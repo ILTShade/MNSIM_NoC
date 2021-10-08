@@ -32,7 +32,7 @@ def main():
 def time_slice(cfg_file, quiet):
     # load cfg
     with open(cfg_file, "r") as f:
-        cfg = yaml.load(f)
+        cfg = yaml.safe_load(f)
     # init array
     # TODO: ONLY FOR TEST
     array = _init_component(cfg, "array")

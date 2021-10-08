@@ -1,0 +1,1 @@
+from mnsim_noc.Wire.base_time_slice_wire import BaseTimeSliceWire
