@@ -1,7 +1,7 @@
 #-*-coding:utf-8-*-
 """
 @FileName:
-    time_slice_array.py
+    time_slice_tile.py
 @Description:
     Array class for time slice
 @Authors:

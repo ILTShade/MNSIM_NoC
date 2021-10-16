@@ -1,7 +1,7 @@
 #-*-coding:utf-8-*-
 """
 @FileName:
-    base_time_slice_tile.py
+    base_tile.py
 @Description:
     Base Tile class for time slice
 @CreateTime:
@@ -10,18 +10,19 @@
 from abc import abstractmethod
 from mnsim_noc import Component
 
-class BaseTimeSliceTile(Component):
-    REGISTRY = "time_slice_tile"
+
+class BaseTile(Component):
+    REGISTRY = "tile"
 
     def __init__(self, position, task_cfg):
         # input and output data
         # format: (start_tile_id, end_tile_id, layer, x, y, length)
         self.position = position
         self.task_cfg = task_cfg
-        self.tile_id = BaseTimeSliceTile.get_tile_id(position)
+        self.tile_id = BaseTile.get_tile_id(position)
         self.input_list = []
         self.output_list = []
-        self.state = None
+        self.state = 0
 
     @classmethod
     def get_tile_id(cls, position):
