@@ -43,7 +43,9 @@ class TimeSliceTile(BaseTile):
         # 计算所需时间片数
         self.computing_time = task_cfg.computing_time
         # 输出广播Tile坐标列表
-        self.nodes_out = task_cfg.nodes_out
+        self.end_tiles = task_cfg.end_tiles
+        # 输出列表顶部输出仍需广播的Tile坐标列表
+        self.current_end_tiles = self.end_tiles
         # 计算中的输出（输出特征图坐标）
         self.computing_output = None
         # 下次计算的输出坐标
@@ -51,8 +53,11 @@ class TimeSliceTile(BaseTile):
         # 无用输入最右下角的范围
         # (x_in, y_in, h)
         self.useless = (0, 0)
+        # 是否正在向外传输数据
+        self.is_transmitting = False
 
     def update_input(self, inputs):
+        # Tile接收Wire输入过程
         # inputs格式只需要特征图上的坐标即可,用元组实现
         if self.num_in == 1:
             self.input_list.extend(inputs)
@@ -75,6 +80,7 @@ class TimeSliceTile(BaseTile):
                     self.input_to_be_merged[single_input] = 1
 
     def update_time_slice(self):
+        # Tile内部计算过程
         # 若当前无计算任务（空闲/已完成）
         if self.state == 0:
             # 已完成任务，则更新输出列表
@@ -98,7 +104,7 @@ class TimeSliceTile(BaseTile):
                     # 若满足下次输出需求
                     if (self.latest_input[0] * self.width_input + self.latest_input[1]) >= (
                             x_req * self.width_input + y_req):
-                        # 更新self.useless
+                        # 更新无用输入范围
                         if x_req == self.height_input:
                             x_useless = x_req
                             h_useless = self.height_core
@@ -110,9 +116,9 @@ class TimeSliceTile(BaseTile):
                         else:
                             y_useless = min(y_req-self.width_core+self.stride_core, self.width_input)
                         self.useless = (x_useless, y_useless, h_useless)
-                        # 更新self.computing_output
+                        # 更新当前输出坐标
                         self.computing_output = self.next_output
-                        # 更新self.next_output
+                        # 更新下次输出坐标
                         x_new = (self.next_output[0] * self.width_output + self.next_output[1]) // self.width_output
                         y_new = (self.next_output[0] * self.width_output + self.next_output[1]) % self.width_output + 1
                         self.next_output = (x_new, y_new)
@@ -125,5 +131,13 @@ class TimeSliceTile(BaseTile):
         else:
             self.state -= 1
 
-    def update_output(self):
-        pass
+    def update_output(self, outputs):
+        # 更新所有传输完成输出
+        # 格式:(x, y, end_tile_id)
+        for single_output in outputs:
+            if single_output[2] in self.current_end_tiles:
+                self.current_end_tiles.remove(single_output[2])
+        if not self.current_end_tiles:
+            self.output_list.pop()
+            self.current_end_tiles = self.end_tiles
+            self.is_transmitting = False

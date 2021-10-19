@@ -1,1 +1,2 @@
-from mnsim_noc.Wire.base_time_slice_wire import BaseTimeSliceWire
+from mnsim_noc.Wire.base_wire import BaseWire
+from mnsim_noc.Wire.time_slice_wire import TimeSliceWire
