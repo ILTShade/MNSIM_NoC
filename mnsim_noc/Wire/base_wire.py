@@ -1,7 +1,7 @@
-#-*-coding:utf-8-*-
+# -*-coding:utf-8-*-
 """
 @FileName:
-    base_time_slice_wire.py
+    base_wire.py
 @Description:
     Base Wire Class for time slice
 @CreateTime:
@@ -10,12 +10,13 @@
 from abc import abstractmethod
 from mnsim_noc import Component
 
-class BaseTimeSliceWire(Component):
-    REGISTRY = "time_slice_wire"
+
+class BaseWire(Component):
+    REGISTRY = "wire"
 
     def __init__(self, position):
         self.position = position
-        self.wire_id = BaseTimeSliceWire.get_tile_id(position)
+        self.wire_id = BaseWire.get_tile_id(position)
         self.state = None
 
     @classmethod
