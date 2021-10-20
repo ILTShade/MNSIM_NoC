@@ -22,6 +22,7 @@ class BaseTile(Component):
         self.tile_id = BaseTile.get_tile_id(position)
         self.input_list = []
         self.output_list = []
+        # 计算剩余时间片数
         self.state = 0
 
     @classmethod

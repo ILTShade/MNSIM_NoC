@@ -17,7 +17,6 @@ class BaseWire(Component):
     def __init__(self, position):
         self.position = position
         self.wire_id = BaseWire.get_tile_id(position)
-        self.state = None
 
     @classmethod
     def get_tile_id(cls, position):
