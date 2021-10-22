@@ -10,6 +10,7 @@
 from abc import abstractmethod
 from mnsim_noc.base import Component
 
+
 class BaseRouter(Component):
     REGISTRY = "router"
 

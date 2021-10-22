@@ -49,7 +49,7 @@ class TimeSliceArray(BaseArray):
             # 2, get all transfer data
             transfer_data = dict()
             for tile_id, tile in self.tile_dict.items():
-                transfer_data[tile_id] = tile.update_output()
+                transfer_data[tile_id] = tile.get_output()
             # 3, get all wire state
             wire_state = dict()
             for wire_id, wire in self.wire_dict.items():

@@ -38,5 +38,9 @@ class BaseTile(Component):
         pass
 
     @abstractmethod
+    def get_output(self):
+        pass
+
+    @abstractmethod
     def update_output(self):
         pass
