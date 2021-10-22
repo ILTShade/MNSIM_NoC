@@ -18,6 +18,7 @@ class TimeSliceTile(BaseTile):
         # format: (start_tile_id, end_tile_id, layer, x, y, length)
         super().__init__(self, position, task_cfg)
         # TODO:将参数从task_cfg中分离一些出来
+        self.length = task_cfg.length
         # Tile在网络中的层数
         self.layer_in = task_cfg.layer_in
         self.layer_out = task_cfg.layer_out
@@ -137,7 +138,16 @@ class TimeSliceTile(BaseTile):
         for single_output in outputs:
             if single_output[2] in self.current_end_tiles:
                 self.current_end_tiles.remove(single_output[2])
+            else:
+                # TODO:log错误
+                pass
         if not self.current_end_tiles:
             self.output_list.pop()
             self.current_end_tiles = self.end_tiles
             self.is_transmitting = False
+
+    def get_output(self):
+        # 返回最新的输出数据,一个时间片内只返回一个
+        if self.output_list:
+            output = self.output_list[0]
+            return output[0], output[1], self.current_end_tiles[0]
