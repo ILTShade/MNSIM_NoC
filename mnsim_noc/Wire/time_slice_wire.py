@@ -15,13 +15,14 @@ class TimeSliceWire(BaseWire):
 
     def __init__(self, position):
         super().__init__(self, position)
-        # 正在传输的数据(在特征图上坐标及特征图层数)
+        # data transmitted on the wire
+        # format: (x, y, end_tile_id, layer)
         self.data = None
-        # 剩余传输任务占用时间片数
+        # Number of time slice required for finishing the transmission
         self.state = 0
-        # 是否被占用
+        # if the wire is occupied
         self.is_occupied = False
-        # Wire是否将数据传入end_tile
+        # if the wire is next to the end tile
         self.is_last = False
         self.end_tile_id = None
 
@@ -39,6 +40,6 @@ class TimeSliceWire(BaseWire):
             if self.state == 0:
                 self.is_occupied = False
                 if self.is_last:
-                    # 返回数据以更新Tile
+                    # return data to update tile
                     return self.data
         return None
