@@ -20,9 +20,10 @@ class BaseTile(Component):
         self.position = position
         self.task_cfg = task_cfg
         self.tile_id = BaseTile.get_tile_id(position)
+        # format: (x,y) on input/output feature map
         self.input_list = []
         self.output_list = []
-        # 计算剩余时间片数
+        # Number of time slice required for computing the next output
         self.state = 0
 
     @classmethod
