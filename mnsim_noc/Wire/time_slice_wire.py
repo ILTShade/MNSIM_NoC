@@ -22,16 +22,19 @@ class TimeSliceWire(BaseWire):
         self.state = 0
         # if the wire is occupied
         self.is_occupied = False
+        # if the wire is next to the start tile
+        self.is_first = False
         # if the wire is next to the end tile
         self.is_last = False
         self.end_tile_id = None
 
     def set_wire_task(self, wire_tasks):
-        # Format:(end_tile_id, layer, x, y, length, is_last)
+        # Format:(end_tile_id, layer, x, y, length, is_first, is_last)
         self.state = wire_tasks[4]
         self.data = (wire_tasks[2], wire_tasks[3], wire_tasks[1])
         self.is_occupied = True
-        self.is_last = wire_tasks[5]
+        self.is_first = wire_tasks[5]
+        self.is_last = wire_tasks[6]
         self.end_tile_id = wire_tasks[0]
 
     def update_time_slice(self):
@@ -39,7 +42,9 @@ class TimeSliceWire(BaseWire):
             self.state -= 1
             if self.state == 0:
                 self.is_occupied = False
+                # return data to update tile
+                if self.is_first:
+                    return self.data, True
                 if self.is_last:
-                    # return data to update tile
-                    return self.data
+                    return self.data, False
         return None
