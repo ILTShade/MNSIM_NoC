@@ -53,20 +53,9 @@ class CONVTimeSliceTile(TimeSliceTile):
 
     def update_time_slice(self):
         # Computing process in conv tile
-        # if the tile is not computing
+        # if the tile was not computing
         if self.state == 0:
-            # if the tile just finished the computation
-            if self.computing_output:
-                self.output_list.append(self.computing_output)
-                self.computing_output = None
-                # delete useless inputs from input_list considering the self.useless
-                list_for_search = self.input_list
-                for single_input in list_for_search:
-                    if single_input[0] <= self.useless[0] - self.useless[2] or (
-                            single_input[0] <= self.useless[0] and single_input[1] <= self.useless[1]):
-                        self.input_list.remove(single_input)
-
-            # if the input_list is not empty
+            # allocate computation task
             if self.input_list:
                 x_req = min(self.height_input,
                             self.height_core + self.stride_core * (self.next_output[0] - 1) - self.padding_core)
@@ -95,5 +84,17 @@ class CONVTimeSliceTile(TimeSliceTile):
                     self.next_output = (x_new, y_new)
                     # update state
                     self.state = self.computing_time
-        else:
+        # compute in the time slice
+        if self.state > 0:
             self.state -= 1
+        # if the tile just finished the computation
+        if self.state == 0:
+            if self.computing_output:
+                self.output_list.append(self.computing_output)
+                self.computing_output = None
+                # delete useless inputs from input_list considering the self.useless
+                list_for_search = self.input_list
+                for single_input in list_for_search:
+                    if single_input[0] <= self.useless[0] - self.useless[2] or (
+                            single_input[0] <= self.useless[0] and single_input[1] <= self.useless[1]):
+                        self.input_list.remove(single_input)

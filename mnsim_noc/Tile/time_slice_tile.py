@@ -68,7 +68,7 @@ class TimeSliceTile(BaseTile):
             if single_output[2] in self.current_end_tiles:
                 self.current_end_tiles.remove(single_output[2])
             else:
-                # TODO:log错误
+                # TODO:log error
                 pass
         if not self.current_end_tiles:
             self.output_list.pop()
@@ -77,7 +77,7 @@ class TimeSliceTile(BaseTile):
 
     def get_output(self):
         # return the output to be transmitted through wires
-        # outputs format: (x, y, end_tile_id, layer_out)
+        # outputs format: (x, y, end_tile_id, length, layer_out)
         if self.output_list:
             output = self.output_list[0]
-            return output[0], output[1], self.current_end_tiles[0], self.layer_out
+            return output[0], output[1], self.current_end_tiles[0], self.length, self.layer_out

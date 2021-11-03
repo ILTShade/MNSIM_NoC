@@ -16,6 +16,8 @@ class TimeSliceRouter(BaseRouter):
 
     def __init__(self):
         super().__init__(self)
+        self.wire_state = None
+        self.paths = []
 
     def assign(self, transfer_data, wire_state):
         """
@@ -26,12 +28,18 @@ class TimeSliceRouter(BaseRouter):
             routing results: paths
         """
         # All paths arranged
-        # path format: (list[occupied_wire_id], (x, y, end_tile_id))
-        paths = []
-        for start_tile_id in transfer_data:
+        # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
+        self.paths = []
+        # mark the occupation during routing
+        self.wire_state = wire_state
+        for start_tile_id, tile_data in transfer_data.items():
+            if not tile_data:
+                continue
+            # tile_data format:
+            # (x, y, end_tile_id, length, layer_out)
             # extract tile position from id
             start_tile_position = tuple(map(int, re.findall(r"\d+", start_tile_id)))
-            end_tile_position = tuple(map(int, re.findall(r"\d+", transfer_data[start_tile_id][2])))
+            end_tile_position = tuple(map(int, re.findall(r"\d+", tile_data[2])))
             step_x = end_tile_position[0]-start_tile_position[0]
             step_y = end_tile_position[1]-start_tile_position[1]
             # North:0; West:1; South:2; East:3;
@@ -46,7 +54,7 @@ class TimeSliceRouter(BaseRouter):
                 # go i steps in x
                 for j in range(1, i):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
-                    if wire_state[current_wire_id] == 0:
+                    if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
                         current_position[0] += 1
                     else:
@@ -58,7 +66,7 @@ class TimeSliceRouter(BaseRouter):
                 # go in y
                 for j in range(1, abs(step_y)):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_y)
-                    if wire_state[current_wire_id] == 0:
+                    if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
                         current_position[1] += 1
                     else:
@@ -70,7 +78,7 @@ class TimeSliceRouter(BaseRouter):
                 # go abs(step_x)-i steps in x
                 for j in range(1, abs(step_x)-i):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
-                    if wire_state[current_wire_id] == 0:
+                    if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
                         current_position[0] += 1
                     else:
@@ -81,5 +89,7 @@ class TimeSliceRouter(BaseRouter):
                     continue
                 break
             if current_path:
-                paths.append((current_path, transfer_data[start_tile_id][0:2]))
-        return paths
+                self.paths.append((current_path, tile_data))
+                for path_wire_id in current_path:
+                    self.wire_state[path_wire_id] = 1
+        return self.paths
