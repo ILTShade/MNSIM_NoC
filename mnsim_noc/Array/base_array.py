@@ -11,6 +11,7 @@
 from abc import abstractmethod
 from mnsim_noc import Component
 
+
 class BaseArray(Component):
     REGISTRY = "array"
 
