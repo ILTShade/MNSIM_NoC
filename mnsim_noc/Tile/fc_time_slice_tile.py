@@ -47,7 +47,15 @@ class FCTimeSliceTile(TimeSliceTile):
             return
         # if the tile is not computing
         if self.state == 0:
-            # if the tile just finished the computation
+            # if the input satisfy the requirement
+            if self.latest_input == (self.height_input, self.width_input):
+                self.state = self.computing_time
+                self.input_complete = True
+        # compute in the time slice
+        if self.state > 0:
+            self.state -= 1
+        # if the tile just finished the computation
+        if self.state == 0:
             if self.input_complete:
                 for i in range(1, self.height_output):
                     for j in range(1, self.width_input):
@@ -55,10 +63,3 @@ class FCTimeSliceTile(TimeSliceTile):
                 # delete all inputs
                 self.input_list = []
                 self.output_complete = True
-
-            # if the input_list contains all inputs
-            elif self.latest_input == (self.height_input, self.width_input):
-                self.state = self.computing_time
-                self.input_complete = True
-        else:
-            self.state -= 1
