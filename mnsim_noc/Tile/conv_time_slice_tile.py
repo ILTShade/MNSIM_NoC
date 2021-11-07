@@ -26,6 +26,8 @@ class CONVTimeSliceTile(TimeSliceTile):
                 Output layer
             num_in:
                 Number of inputs required for a node in input feature map
+            num_out:
+                Number of outputs required for a node in output feature map
             height_core; width_core; stride_core; padding_core:
                 Parameter of the convolution kernel
             height_input; width_input:
@@ -36,6 +38,8 @@ class CONVTimeSliceTile(TimeSliceTile):
                 Number of time slice required for computing a node on output feature
             end_tiles:
                 List of id of tiles where the outputs should be sent to
+            aggregate:
+                whether the tile is a merging node or not
         """
         super().__init__(self, position, task_cfg)
         # Extract parameters from task_cfg
@@ -90,7 +94,18 @@ class CONVTimeSliceTile(TimeSliceTile):
         # if the tile just finished the computation
         if self.state == 0:
             if self.computing_output:
-                self.output_list.append(self.computing_output)
+                if self.num_out == 1:
+                    self.output_list.append(self.computing_output)
+                elif self.computing_output in self.output_to_be_merged:
+                    current_num = self.output_to_be_merged[self.computing_output]
+                    if current_num == self.num_out - 1:
+                        self.output_list.append(self.computing_output)
+                        del self.output_to_be_merged[self.computing_output]
+                    else:
+                        self.output_to_be_merged[self.computing_output] = current_num + 1
+                # if not
+                else:
+                    self.output_to_be_merged[self.computing_output] = 1
                 self.computing_output = None
                 # delete useless inputs from input_list considering the self.useless
                 list_for_search = self.input_list

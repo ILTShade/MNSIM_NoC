@@ -21,6 +21,7 @@ class TimeSliceTile(BaseTile):
         self.layer_in = task_cfg.layer_in
         self.layer_out = task_cfg.layer_out
         self.num_in = task_cfg.num_in
+        self.num_out = task_cfg.num_out
         self.height_input = task_cfg.height_input
         self.width_input = task_cfg.width_input
         self.height_output = task_cfg.height_output
@@ -29,6 +30,8 @@ class TimeSliceTile(BaseTile):
         self.end_tiles = task_cfg.end_tiles
         # Number of inputs for a certain node in input feature map
         self.input_to_be_merged = dict()
+        # Number of inputs for a certain node in input feature map
+        self.output_to_be_merged = dict()
         # Coordinate of the latest input on the input feature map
         self.latest_input = (0, 0)
         # List of id of tiles where the current output still needs to be sent to
@@ -38,24 +41,37 @@ class TimeSliceTile(BaseTile):
 
     def update_input(self, inputs):
         # Update the input_list with new inputs
-        # inputs format: (x, y) on input feature map
+        # inputs format: (x, y, layer) on input feature map
         # Merge new inputs into nodes on input feature map, and then add to input_list
-        if self.num_in == 1:
-            self.input_list.extend(inputs)
-        else:
-            for single_input in inputs:
+        for single_input in inputs:
+            if single_input[2] == self.layer_in:
+                if self.num_in == 1:
+                    self.input_list.append(single_input[0:2])
                 # if there exist inputs for the same node on input feature map
-                if single_input in self.input_to_be_merged:
-                    current_num = self.input_to_be_merged[single_input]
+                elif single_input[0:2] in self.input_to_be_merged:
+                    current_num = self.input_to_be_merged[single_input[0:2]]
                     if current_num == self.num_in - 1:
-                        self.input_list.append(single_input)
-                        self.latest_input = single_input
-                        del self.input_to_be_merged[single_input]
+                        self.input_list.append(single_input[0:2])
+                        self.latest_input = single_input[0:2]
+                        del self.input_to_be_merged[single_input[0:2]]
                     else:
-                        self.input_to_be_merged[single_input] = current_num + 1
+                        self.input_to_be_merged[single_input[0:2]] = current_num + 1
                 # if not
                 else:
                     self.input_to_be_merged[single_input] = 1
+            elif single_input[2] == self.layer_out:
+                if self.num_out == 1:
+                    self.logger.warn("Error: wrong input layer")
+                elif single_input[0:2] in self.output_to_be_merged:
+                    current_num = self.output_to_be_merged[single_input[0:2]]
+                    if current_num == self.num_out - 1:
+                        self.output_list.append(single_input[0:2])
+                        del self.output_to_be_merged[single_input[0:2]]
+                    else:
+                        self.output_to_be_merged[single_input[0:2]] = current_num + 1
+                # if not
+                else:
+                    self.output_to_be_merged[single_input[0:2]] = 1
 
     @abstractmethod
     def update_time_slice(self):

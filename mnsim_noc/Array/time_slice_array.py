@@ -57,7 +57,7 @@ class TimeSliceArray(BaseArray):
                     self.tile_dict[tile_id].update_output([wire_data[0:3]])
                 if wire_data[5]:
                     tile_id = wire_data[2]
-                    self.tile_dict[tile_id].update_input([wire_data[0:2]])
+                    self.tile_dict[tile_id].update_input([wire_data[0:2]+wire_data[3]])
 
     def run(self):
         # task assignment

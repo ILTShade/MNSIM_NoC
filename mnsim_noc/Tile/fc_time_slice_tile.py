@@ -26,6 +26,8 @@ class FCTimeSliceTile(TimeSliceTile):
                 Output layer num
             num_in:
                 Number of inputs required for a node in input feature map
+            num_out:
+                Number of outputs required for a node in output feature map
             height_input; width_input:
                 height and width of the input feature
             height_output; width_output:
@@ -34,6 +36,8 @@ class FCTimeSliceTile(TimeSliceTile):
                 Number of time slice required for computing a node on output feature
             end_tiles:
                 List of id of tiles where the outputs should be sent to
+            aggregate:
+                whether the tile is a merging node or not
         """
         super().__init__(self, position, task_cfg)
         # Coordinate of the output under computation on the output feature map
@@ -59,7 +63,18 @@ class FCTimeSliceTile(TimeSliceTile):
             if self.input_complete:
                 for i in range(1, self.height_output):
                     for j in range(1, self.width_input):
-                        self.output_list.append((i, j))
+                        if self.num_out == 1:
+                            self.output_list.append((i, j))
+                        elif (i, j) in self.output_to_be_merged:
+                            current_num = self.output_to_be_merged[(i, j)]
+                            if current_num == self.num_out - 1:
+                                self.output_list.append((i, j))
+                                del self.output_to_be_merged[(i, j)]
+                            else:
+                                self.output_to_be_merged[(i, j)] = current_num + 1
+                        # if not
+                        else:
+                            self.output_to_be_merged[(i, j)] = 1
                 # delete all inputs
                 self.input_list = []
                 self.output_complete = True
