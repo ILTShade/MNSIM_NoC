@@ -24,8 +24,6 @@ class CONVTimeSliceTile(TimeSliceTile):
                 Input layer
             layer_out:
                 Output layer
-            num_in:
-                Number of inputs required for a node in input feature map
             num_out:
                 Number of outputs required for a node in output feature map
             height_core; width_core; stride_core; padding_core:
@@ -38,15 +36,13 @@ class CONVTimeSliceTile(TimeSliceTile):
                 Number of time slice required for computing a node on output feature
             end_tiles:
                 List of id of tiles where the outputs should be sent to
-            aggregate:
-                whether the tile is a merging node or not
         """
         super().__init__(self, position, task_cfg)
         # Extract parameters from task_cfg
-        self.height_core = task_cfg.height_core
-        self.width_core = task_cfg.width_core
-        self.stride_core = task_cfg.stride_core
-        self.padding_core = task_cfg.padding_core
+        self.height_core = task_cfg['height_core']
+        self.width_core = task_cfg['width_core']
+        self.stride_core = task_cfg['stride_core']
+        self.padding_core = task_cfg['padding_core']
         # Coordinate of the output under computation on the output feature map
         self.computing_output = None
         # Coordinate of the output to be computed next on the output feature map

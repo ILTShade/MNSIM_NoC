@@ -24,8 +24,6 @@ class FCTimeSliceTile(TimeSliceTile):
                 Input layer num
             layer_out:
                 Output layer num
-            num_in:
-                Number of inputs required for a node in input feature map
             num_out:
                 Number of outputs required for a node in output feature map
             height_input; width_input:
@@ -36,8 +34,6 @@ class FCTimeSliceTile(TimeSliceTile):
                 Number of time slice required for computing a node on output feature
             end_tiles:
                 List of id of tiles where the outputs should be sent to
-            aggregate:
-                whether the tile is a merging node or not
         """
         super().__init__(self, position, task_cfg)
         # Coordinate of the output under computation on the output feature map

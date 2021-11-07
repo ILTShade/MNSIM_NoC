@@ -24,8 +24,6 @@ class PoolingTimeSliceTile(TimeSliceTile):
                 Input layer
             layer_out:
                 Output layer
-            num_in:
-                Number of inputs required for a node in input feature map
             num_out:
                 Number of outputs required for a node in output feature map
             height_filter; width_filter; stride_filter; padding_filter:
@@ -38,15 +36,13 @@ class PoolingTimeSliceTile(TimeSliceTile):
                 Number of time slice required for computing a node on output feature
             end_tiles:
                 List of id of tiles where the outputs should be sent to
-            aggregate:
-                whether the tile is a merging node or not
         """
         super().__init__(self, position, task_cfg)
         # Extract parameters from task_cfg
-        self.height_filter = task_cfg.height_filter
-        self.width_filter = task_cfg.width_filter
-        self.stride_filter = task_cfg.stride_filter
-        self.padding_filter = task_cfg.padding_filter
+        self.height_filter = task_cfg['height_filter']
+        self.width_filter = task_cfg['width_filter']
+        self.stride_filter = task_cfg['stride_filter']
+        self.padding_filter = task_cfg['padding_filter']
         # Coordinate of the output under computation on the output feature map
         self.computing_output = None
         # Coordinate of the output to be computed next on the output feature map
