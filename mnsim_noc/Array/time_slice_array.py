@@ -9,7 +9,9 @@
 @CreateTime:
     2021/10/08 18:28
 """
+from copy import copy
 import re
+import copy
 import configparser as cp
 from mnsim_noc.Array import BaseArray
 from mnsim_noc.Tile import FCTimeSliceTile, CONVTimeSliceTile, PoolingTimeSliceTile
@@ -25,7 +27,7 @@ class TimeSliceArray(BaseArray):
     sim_config_path: hardware description
     '''
     def __init__(self, tcg_mapping, time_slice, sim_config_path):
-        super().__init__(self, tcg_mapping)
+        super().__init__(tcg_mapping)
         # 切片时长: ns
         self.time_slice = time_slice
         tcg_config = cp.ConfigParser()
@@ -45,19 +47,20 @@ class TimeSliceArray(BaseArray):
             cfg = dict()
             # TODO: extended to support branch
             # can be extended to support branch
-            cfg['length'] = int(layer_dict['Outputchannel']) * int(
-                layer_dict['outputbit']) / self.bandwidth / self.time_slice
             if len(self.tcg_mapping.layer_tileinfo[layer_id]['Inputindex']) > 1:
                 self.logger.warn('Do not support branch')
             cfg['layer_in'] = self.tcg_mapping.layer_tileinfo[layer_id]['Inputindex'][0] + layer_id
             if len(self.tcg_mapping.layer_tileinfo[layer_id]['Outputindex']) > 1:
                 self.logger.warn('Do not support branch')
-            cfg['tile_out'] = self.tcg_mapping.layer_tileinfo[layer_id]['Outputindex'][0] + layer_id
+            elif len(self.tcg_mapping.layer_tileinfo[layer_id]['Outputindex']) == 0:
+                cfg['tile_out'] = -1
+            else:
+                cfg['tile_out'] = self.tcg_mapping.layer_tileinfo[layer_id]['Outputindex'][0] + layer_id
             cfg['layer_out'] = layer_id
             cfg['tile_num'] = self.tcg_mapping.layer_tileinfo[layer_id]['tilenum']
             cfg['tile_id'] = []
             cfg['aggregate_arg'] = self.tcg_mapping.aggregate_arg[layer_id]
-            # cfg['computing_time']
+            cfg['computing_time'] = 100/self.time_slice
             # cfg['end_tiles']
             if layer_dict['type'] == 'conv':
                 cfg['type'] = 'conv'
@@ -67,6 +70,8 @@ class TimeSliceArray(BaseArray):
                 cfg['width_output'] = layer_dict['Outputsize'][1]
                 cfg['height_core'] = layer_dict['Kernelsize']
                 cfg['width_core'] = layer_dict['Kernelsize']
+                cfg['stride_core'] = layer_dict['Stride']
+                cfg['padding_core'] = layer_dict['Padding']
             elif layer_dict['type'] == 'pooling':
                 cfg['type'] = 'pooling'
                 cfg['height_input'] = layer_dict['Inputsize'][0]
@@ -75,6 +80,8 @@ class TimeSliceArray(BaseArray):
                 cfg['width_output'] = layer_dict['Outputsize'][1]
                 cfg['height_filter'] = layer_dict['Kernelsize']
                 cfg['width_filter'] = layer_dict['Kernelsize']
+                cfg['stride_filter'] = layer_dict['Stride']
+                cfg['padding_filter'] = layer_dict['Padding']
             elif layer_dict['type'] == 'fc':
                 cfg['type'] = 'fc'
                 cfg['height_input'] = layer_dict['Infeature']
@@ -83,34 +90,48 @@ class TimeSliceArray(BaseArray):
                 cfg['width_output'] = 0
             else:
                 self.logger.warn('Unsupported layer type, layer_id:' + str(layer_id))
+            if layer_id < self.tcg_mapping.layer_num-1:
+                cfg['length'] = round(int(layer_dict['Outputchannel']) * int(
+                    layer_dict['outputbit']) / self.bandwidth / self.time_slice)
+            else:
+                cfg['length'] = 0
             self.layer_cfg.append(cfg)
         # generate tile_ids and aggregate_arg for layers
         for i in range(self.tcg_mapping.tile_num[0]):
             for j in range(self.tcg_mapping.tile_num[1]):
-                layer_id = self.tcg_mapping.mapping_result[i][j]
-                self.layer_cfg[layer_id]['tile_id'].append("{}_{}".format(i, j))
+                layer_id = int(self.tcg_mapping.mapping_result[i][j])
+                if layer_id >= 0:
+                    self.layer_cfg[layer_id]['tile_id'].append("{}_{}".format(i, j))
         # allocate the tiles
         for i in range(self.tcg_mapping.tile_num[0]):
             for j in range(self.tcg_mapping.tile_num[1]):
-                layer_id = self.tcg_mapping.mapping_result[i][j]
-                cfg = self.layer_cfg[layer_id]
-                # TODO: extended to support branch
-                # process the aggregate tile
-                if (cfg['aggregate_arg'][0], cfg['aggregate_arg'][1]) == (i, j):
-                    cfg['end_tiles'] = self.layer_cfg[cfg['tile_out']]['tile_id']
-                    cfg['num_out'] = cfg['tile_num']
-                else:
-                    cfg['end_tiles'] = "{}_{}".format(cfg['aggregate_arg'][0], cfg['aggregate_arg'][1])
-                    cfg['num_out'] = 1
-                    cfg['length'] = round(cfg['length'] / cfg['tile_num'])
-                # different tile types
-                if cfg['type'] == 'conv':
-                    tile = CONVTimeSliceTile((i, j), cfg)
-                elif cfg['type'] == 'fc':
-                    tile = FCTimeSliceTile((i, j), cfg)
-                elif cfg['type'] == 'pooling':
-                    tile = PoolingTimeSliceTile((i, j), cfg)
-                self.tile_dict[tile.tile_id] = tile
+                layer_id = int(self.tcg_mapping.mapping_result[i][j])
+                if layer_id >=0:
+                    cfg = copy.deepcopy(self.layer_cfg[layer_id])
+                    # TODO: extended to support branch
+                    # process the aggregate tile
+                    if (cfg['aggregate_arg'][0], cfg['aggregate_arg'][1]) == (i, j):
+                        if layer_id == self.tcg_mapping.layer_num-1:
+                            cfg['end_tiles'] = []
+                        else:
+                            cfg['end_tiles'] = self.layer_cfg[cfg['tile_out']]['tile_id']
+                        cfg['num_out'] = cfg['tile_num']
+                    else:
+                        if layer_id == self.tcg_mapping.layer_num-1:
+                            cfg['end_tiles'] = []
+                        else:
+                            cfg['end_tiles'] = ["{}_{}".format(int(cfg['aggregate_arg'][0]), int(cfg['aggregate_arg'][1]))]
+                        cfg['num_out'] = 1
+                        cfg['length'] = round(cfg['length'] / cfg['tile_num'])
+                    # different tile types
+                    if cfg['type'] == 'conv':
+                        tile = CONVTimeSliceTile((i, j), cfg)
+                    elif cfg['type'] == 'fc':
+                        tile = FCTimeSliceTile((i, j), cfg)
+                    elif cfg['type'] == 'pooling':
+                        tile = PoolingTimeSliceTile((i, j), cfg)
+                    # print(cfg)
+                    self.tile_dict[tile.tile_id] = tile
         # allocate the wires
         for i in range(self.tcg_mapping.tile_num[0]):
             for j in range(self.tcg_mapping.tile_num[1]):
@@ -138,12 +159,13 @@ class TimeSliceArray(BaseArray):
         elif self.layer_cfg[0]['type'] == 'fc':
             for x in range(self.layer_cfg[0]['height_input']):
                 inputs_inits.append((x + 1, -1, -1))
+        # print(inputs_inits)
         for tile_id in self.layer_cfg[0]['tile_id']:
-            self.tile_dict[tile_id].update_input(self, inputs_inits)
+            self.tile_dict[tile_id].update_input(inputs_inits)
 
     def check_finish(self):
         for tile_id, tile in self.tile_dict.items():
-            if tile.input_list or tile.output_list:
+            if tile.input_list or (tile.output_list and tile.end_tiles):
                 return False
         for wire_id, wire in self.wire_dict.items():
             if wire.state:
@@ -157,6 +179,8 @@ class TimeSliceArray(BaseArray):
             wire_list = path[0]
             path_data = path[1]
             wire_len = len(wire_list)
+            start_tile_id = "{}_{}".format(tuple(map(int, re.findall(r"\d+", wire_list[0])))[0],tuple(map(int, re.findall(r"\d+", wire_list[0])))[1])
+            self.tile_dict[start_tile_id].is_transmitting = True
             for index, wire_id in enumerate(wire_list):
                 is_first = (index == 0)
                 is_last = (index == wire_len - 1)
@@ -172,7 +196,7 @@ class TimeSliceArray(BaseArray):
                     self.tile_dict[tile_id].update_output([wire_data[0:3]])
                 if wire_data[5]:
                     tile_id = wire_data[2]
-                    self.tile_dict[tile_id].update_input([wire_data[0:2] + wire_data[3]])
+                    self.tile_dict[tile_id].update_input([wire_data[0:2] + (wire_data[3],)])
 
     def run(self):
         # task assignment
@@ -206,5 +230,6 @@ class TimeSliceArray(BaseArray):
             self.set_wire_task(routing_result)
             # 6, record clock_num
             self.clock_num = self.clock_num + 1
+            # print(self.clock_num)
         # print the simulation time
-        self.logger.log('Compute Time: ' + str(self.clock_num * self.time_slice / 1000000) + 'ms')
+        print('Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')

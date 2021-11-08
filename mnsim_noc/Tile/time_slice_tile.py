@@ -15,7 +15,7 @@ class TimeSliceTile(BaseTile):
     NAME = "time_slice_tile"
 
     def __init__(self, position, task_cfg):
-        super().__init__(self, position, task_cfg)
+        super().__init__(position, task_cfg)
         # Extract parameters from task_cfg
         self.length = task_cfg['length']
         self.layer_in = task_cfg['layer_in']
@@ -32,7 +32,7 @@ class TimeSliceTile(BaseTile):
         # Coordinate of the latest input on the input feature map
         self.latest_input = (0, 0)
         # List of id of tiles where the current output still needs to be sent to
-        self.current_end_tiles = self.end_tiles
+        self.current_end_tiles = self.end_tiles[:]
         # whether the tile is transmitting data or not
         self.is_transmitting = False
 
@@ -47,6 +47,7 @@ class TimeSliceTile(BaseTile):
                     single_input = ((single_input[0]-1)//self.width_input+1, (single_input[0]-1) % self.width_input + 1, single_input[2])
             if single_input[2] == self.layer_in:
                 self.input_list.append(single_input[0:2])
+                self.latest_input = single_input[0:2]
             elif single_input[2] == self.layer_out:
                 if self.num_out == 1:
                     self.logger.warn("Error: wrong input layer")
@@ -76,14 +77,16 @@ class TimeSliceTile(BaseTile):
             else:
                 # TODO:log error
                 pass
+            print('Transferred: '+str(self.tile_id)+' to '+str(single_output[2])+' data: '+str(single_output[0:2]))
         if not self.current_end_tiles:
-            self.output_list.pop()
-            self.current_end_tiles = self.end_tiles
-            self.is_transmitting = False
+            if self.output_list:
+                self.output_list.pop(0)
+            self.current_end_tiles = self.end_tiles[:]
+        self.is_transmitting = False
 
     def get_output(self):
         # return the output to be transmitted through wires
         # outputs format: (x, y, end_tile_id, length, layer_out)
-        if self.output_list:
+        if self.output_list and self.current_end_tiles and not self.is_transmitting:
             output = self.output_list[0]
             return output[0], output[1], self.current_end_tiles[0], self.length, self.layer_out

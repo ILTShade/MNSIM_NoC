@@ -15,7 +15,7 @@ class BaseRouter(Component):
     REGISTRY = "router"
 
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
 
     @abstractmethod
     def assign(self, transfer_data, wire_state):

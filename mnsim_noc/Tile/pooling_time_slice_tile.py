@@ -37,7 +37,7 @@ class PoolingTimeSliceTile(TimeSliceTile):
             end_tiles:
                 List of id of tiles where the outputs should be sent to
         """
-        super().__init__(self, position, task_cfg)
+        super().__init__(position, task_cfg)
         # Extract parameters from task_cfg
         self.height_filter = task_cfg['height_filter']
         self.width_filter = task_cfg['width_filter']
@@ -65,13 +65,13 @@ class PoolingTimeSliceTile(TimeSliceTile):
                 if (self.latest_input[0] * self.width_input + self.latest_input[1]) >= (
                         x_req * self.width_input + y_req):
                     # update self.useless
-                    if x_req == self.height_input:
+                    if self.height_filter + self.stride_filter * (self.next_output[0] - 1) - self.padding_filter == self.height_input + self.padding_filter:
                         x_useless = x_req
-                        h_useless = self.height_filter
+                        h_useless = self.height_filter - self.padding_filter
                     else:
-                        x_useless = min(x_req - self.height_filter + self.stride_filter, self.height_filter)
+                        x_useless = min(x_req - self.height_filter + self.stride_filter, self.height_input)
                         h_useless = self.stride_filter
-                    if y_req == self.width_input:
+                    if self.width_filter + self.stride_filter * (self.next_output[1] - 1) - self.padding_filter == self.width_input + self.padding_filter:
                         y_useless = y_req
                     else:
                         y_useless = min(y_req - self.width_filter + self.stride_filter, self.width_input)
@@ -104,7 +104,7 @@ class PoolingTimeSliceTile(TimeSliceTile):
                     self.output_to_be_merged[self.computing_output] = 1
                 self.computing_output = None
                 # delete useless inputs from input_list considering the self.useless
-                list_for_search = self.input_list
+                list_for_search = self.input_list[:]
                 for single_input in list_for_search:
                     if single_input[0] <= self.useless[0] - self.useless[2] or (
                             single_input[0] <= self.useless[0] and single_input[1] <= self.useless[1]):

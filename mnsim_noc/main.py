@@ -38,7 +38,6 @@ def main():
 
 # time slice run
 @main.command(help="Time Slice")
-@click.argument("cfg_file", required=True, type=str)
 @click.option("--quiet", "-q", is_flag=True, default=False)
 @click.option("--nn", "-NN", default='vgg8', help="NN model description (name), default: vgg8")
 @click.option("-HWdes", "--hardware_description", default=os.path.join(os.getcwd(), "SimConfig.ini"),
@@ -47,17 +46,15 @@ def main():
               help="NN model weights file location & name, default:/MNSIM_NoC/cifar10_vgg8_params.pth")
 @click.option("-D", "--device", default=0,
               help="Determine hardware device for simulation, default: CPU")
-@click.option("-DisPipe", "--disable_inner_pipeline", action='store_true',
-              default=False, help="Disable inner layer pipeline in latency modeling, default: false")
 @click.option("--time_slice_span", "-TSS", default=1, help='span of the timeslice in simulation (ns), default: 1')
-def time_slice(cfg_file, quiet, nn, hardware_description, weights, device, disable_inner_pipeline, time_slice_span):
+def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span):
     # load cfg
-    with open(cfg_file, "r") as f:
-        cfg = yaml.safe_load(f)
+    # with open(cfg_file, "r") as f:
+    #     cfg = yaml.safe_load(f)
     # init array
-    __TestInterface = TrainTestInterface(network_module=nn, dataset_module='MNSIM.Interface.cifar10', SimConfig_path=hardware_description, weights_file=args.weights, device=args.device)
+    __TestInterface = TrainTestInterface(network_module=nn, dataset_module='MNSIM.Interface.cifar10', SimConfig_path=hardware_description, weights_file=weights, device=device)
     structure_file = __TestInterface.get_structure()
-    TCG_mapping = TCG(structure_file, hardware_description, disable_inner_pipeline)
+    TCG_mapping = TCG(structure_file, hardware_description, False)
     array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description)
     # run the sim
     array.run()

@@ -35,7 +35,7 @@ class FCTimeSliceTile(TimeSliceTile):
             end_tiles:
                 List of id of tiles where the outputs should be sent to
         """
-        super().__init__(self, position, task_cfg)
+        super().__init__(position, task_cfg)
         # Coordinate of the output under computation on the output feature map
         self.input_complete = False
         self.output_complete = False

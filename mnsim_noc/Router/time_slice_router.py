@@ -15,7 +15,7 @@ class TimeSliceRouter(BaseRouter):
     NAME = "time_slice_tile"
 
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
         self.wire_state = None
         self.paths = []
 
@@ -38,8 +38,8 @@ class TimeSliceRouter(BaseRouter):
             # tile_data format:
             # (x, y, end_tile_id, length, layer_out)
             # extract tile position from id
-            start_tile_position = tuple(map(int, re.findall(r"\d+", start_tile_id)))
-            end_tile_position = tuple(map(int, re.findall(r"\d+", tile_data[2])))
+            start_tile_position = list(map(int, re.findall(r"\d+", start_tile_id)))
+            end_tile_position = list(map(int, re.findall(r"\d+", tile_data[2])))
             step_x = end_tile_position[0]-start_tile_position[0]
             step_y = end_tile_position[1]-start_tile_position[1]
             # North:0; West:1; South:2; East:3;
@@ -90,6 +90,7 @@ class TimeSliceRouter(BaseRouter):
                 break
             if current_path:
                 self.paths.append((current_path, tile_data))
+                print('Routed: '+str(tile_data))
                 for path_wire_id in current_path:
                     self.wire_state[path_wire_id] = 1
         return self.paths
