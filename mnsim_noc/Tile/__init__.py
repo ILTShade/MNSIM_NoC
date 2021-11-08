@@ -1,2 +1,5 @@
 from mnsim_noc.Tile.base_tile import BaseTile
 from mnsim_noc.Tile.time_slice_tile import TimeSliceTile
+from mnsim_noc.Tile.fc_time_slice_tile import FCTimeSliceTile
+from mnsim_noc.Tile.conv_time_slice_tile import CONVTimeSliceTile
+from mnsim_noc.Tile.pooling_time_slice_tile import PoolingTimeSliceTile

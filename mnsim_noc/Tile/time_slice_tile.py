@@ -41,6 +41,10 @@ class TimeSliceTile(BaseTile):
         # inputs format: (x, y, layer) on input feature map
         # Merge new inputs into nodes on input feature map, and then add to input_list
         for single_input in inputs:
+            # modify the inputs from fc layer
+            if single_input[1] == -1:
+                if self.width_input > 0:
+                    single_input = ((single_input[0]-1)//self.width_input+1, (single_input[0]-1) % self.width_input + 1, single_input[2])
             if single_input[2] == self.layer_in:
                 self.input_list.append(single_input[0:2])
             elif single_input[2] == self.layer_out:

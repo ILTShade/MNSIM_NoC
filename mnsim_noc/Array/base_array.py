@@ -15,11 +15,11 @@ from mnsim_noc import Component
 class BaseArray(Component):
     REGISTRY = "array"
 
-    def __init__(self, array_cfg, total_task, scheduler, router):
-        self.array_cfg = array_cfg
-        self.total_task = total_task
-        self.scheduler = scheduler
-        self.router = router
+    def __init__(self, tcg_mapping):
+        self.tcg_mapping = tcg_mapping
+        # self.total_task = total_task
+        # self.scheduler = scheduler
+        self.router = None
 
     @abstractmethod
     def task_assignment(self):

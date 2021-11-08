@@ -48,7 +48,7 @@ class FCTimeSliceTile(TimeSliceTile):
         # if the tile is not computing
         if self.state == 0:
             # if the input satisfy the requirement
-            if self.latest_input == (self.height_input, self.width_input):
+            if len(self.input_list) == self.height_input:
                 self.state = self.computing_time
                 self.input_complete = True
         # compute in the time slice
@@ -57,20 +57,19 @@ class FCTimeSliceTile(TimeSliceTile):
         # if the tile just finished the computation
         if self.state == 0:
             if self.input_complete:
-                for i in range(1, self.height_output):
-                    for j in range(1, self.width_input):
-                        if self.num_out == 1:
-                            self.output_list.append((i, j))
-                        elif (i, j) in self.output_to_be_merged:
-                            current_num = self.output_to_be_merged[(i, j)]
-                            if current_num == self.num_out - 1:
-                                self.output_list.append((i, j))
-                                del self.output_to_be_merged[(i, j)]
-                            else:
-                                self.output_to_be_merged[(i, j)] = current_num + 1
-                        # if not
+                for i in range(1, self.height_output+1):
+                    if self.num_out == 1:
+                        self.output_list.append((i, -1))
+                    elif (i, -1) in self.output_to_be_merged:
+                        current_num = self.output_to_be_merged[(i, -1)]
+                        if current_num == self.num_out - 1:
+                            self.output_list.append((i, -1))
+                            del self.output_to_be_merged[(i, -1)]
                         else:
-                            self.output_to_be_merged[(i, j)] = 1
+                            self.output_to_be_merged[(i, -1)] = current_num + 1
+                    # if not
+                    else:
+                        self.output_to_be_merged[(i, -1)] = 1
                 # delete all inputs
                 self.input_list = []
                 self.output_complete = True

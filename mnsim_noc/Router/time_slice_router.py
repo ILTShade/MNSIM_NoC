@@ -48,11 +48,11 @@ class TimeSliceRouter(BaseRouter):
             # Routing algorithm: first in x, then in y, last in x, choose the first possible path
             # Search for possible paths
             current_path = []
-            for i in range(0, abs(step_x)):
+            for i in range(0, abs(step_x)+1):
                 current_position = start_tile_position
                 path_failed = False
                 # go i steps in x
-                for j in range(1, i):
+                for j in range(1, i+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
                     if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
@@ -64,7 +64,7 @@ class TimeSliceRouter(BaseRouter):
                     current_path.clear()
                     continue
                 # go in y
-                for j in range(1, abs(step_y)):
+                for j in range(1, abs(step_y)+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_y)
                     if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
@@ -76,7 +76,7 @@ class TimeSliceRouter(BaseRouter):
                     current_path.clear()
                     continue
                 # go abs(step_x)-i steps in x
-                for j in range(1, abs(step_x)-i):
+                for j in range(1, abs(step_x)-i+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
                     if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
