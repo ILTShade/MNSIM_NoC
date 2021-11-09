@@ -14,7 +14,7 @@ class TimeSliceWire(BaseWire):
     NAME = "time_slice_tile"
 
     def __init__(self, position):
-        super().__init__(self, position)
+        super().__init__(position)
         # data transmitted on the wire
         # format: (x, y, end_tile_id, layer)
         self.data = None
@@ -25,7 +25,7 @@ class TimeSliceWire(BaseWire):
         # Format:(x, y, end_tile_id, length, layer, is_first, is_last)
         self.state = wire_tasks[3]
         # data Format:(x, y, end_tile_id, layer, is_first, is_last)
-        self.data = (wire_tasks[0:3], wire_tasks[4:7])
+        self.data = wire_tasks[0:3] + wire_tasks[4:7]
 
     def update_time_slice(self):
         if self.state > 0:

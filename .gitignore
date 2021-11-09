@@ -110,3 +110,6 @@ results/
 ._*
 *.DS_Store
 *.json
+
+# pth
+*.pth
