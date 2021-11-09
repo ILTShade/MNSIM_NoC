@@ -77,7 +77,6 @@ class TimeSliceTile(BaseTile):
             else:
                 # TODO:log error
                 pass
-            print('Transferred: '+str(self.tile_id)+' to '+str(single_output[2])+' data: '+str(single_output[0:2]))
         if not self.current_end_tiles:
             if self.output_list:
                 self.output_list.pop(0)

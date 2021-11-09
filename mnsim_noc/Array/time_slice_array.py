@@ -17,6 +17,7 @@ from mnsim_noc.Array import BaseArray
 from mnsim_noc.Tile import FCTimeSliceTile, CONVTimeSliceTile, PoolingTimeSliceTile
 from mnsim_noc.Wire import TimeSliceWire
 from mnsim_noc.Router import TimeSliceRouter
+from MNSIM.Latency_Model.Model_latency import tile_latency_analysis,pooling_latency_analysis
 
 
 class TimeSliceArray(BaseArray):
@@ -30,6 +31,7 @@ class TimeSliceArray(BaseArray):
         super().__init__(tcg_mapping)
         # 切片时长: ns
         self.time_slice = time_slice
+        self.sim_config_path = sim_config_path
         tcg_config = cp.ConfigParser()
         tcg_config.read(sim_config_path, encoding='UTF-8')
         # 传输线带宽: Gbps
@@ -60,36 +62,59 @@ class TimeSliceArray(BaseArray):
             cfg['tile_num'] = self.tcg_mapping.layer_tileinfo[layer_id]['tilenum']
             cfg['tile_id'] = []
             cfg['aggregate_arg'] = self.tcg_mapping.aggregate_arg[layer_id]
-            cfg['computing_time'] = 100/self.time_slice
-            # cfg['end_tiles']
             if layer_dict['type'] == 'conv':
                 cfg['type'] = 'conv'
-                cfg['height_input'] = layer_dict['Inputsize'][0]
-                cfg['width_input'] = layer_dict['Inputsize'][1]
-                cfg['height_output'] = layer_dict['Outputsize'][0]
-                cfg['width_output'] = layer_dict['Outputsize'][1]
-                cfg['height_core'] = layer_dict['Kernelsize']
-                cfg['width_core'] = layer_dict['Kernelsize']
-                cfg['stride_core'] = layer_dict['Stride']
-                cfg['padding_core'] = layer_dict['Padding']
+                cfg['height_input'] = int(layer_dict['Inputsize'][0])
+                cfg['width_input'] = int(layer_dict['Inputsize'][1])
+                cfg['height_output'] = int(layer_dict['Outputsize'][0])
+                cfg['width_output'] = int(layer_dict['Outputsize'][1])
+                cfg['height_core'] = int(layer_dict['Kernelsize'])
+                cfg['width_core'] = int(layer_dict['Kernelsize'])
+                cfg['stride_core'] = int(layer_dict['Stride'])
+                cfg['padding_core'] = int(layer_dict['Padding'])
+                temp_tile_latency = tile_latency_analysis(SimConfig_path=self.sim_config_path,
+                                                read_row=self.tcg_mapping.layer_tileinfo[layer_id]['max_row'],
+                                                read_column=self.tcg_mapping.layer_tileinfo[layer_id]['max_column'],
+                                                indata=0, rdata=0, inprecision=int(layer_dict['Inputbit']),
+                                                PE_num=self.tcg_mapping.layer_tileinfo[layer_id]['max_PE'],
+                                                default_inbuf_size=self.tcg_mapping.max_inbuf_size,
+                                                default_outbuf_size=self.tcg_mapping.max_outbuf_size
+                                                )
+                cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
             elif layer_dict['type'] == 'pooling':
                 cfg['type'] = 'pooling'
-                cfg['height_input'] = layer_dict['Inputsize'][0]
-                cfg['width_input'] = layer_dict['Inputsize'][1]
-                cfg['height_output'] = layer_dict['Outputsize'][0]
-                cfg['width_output'] = layer_dict['Outputsize'][1]
-                cfg['height_filter'] = layer_dict['Kernelsize']
-                cfg['width_filter'] = layer_dict['Kernelsize']
-                cfg['stride_filter'] = layer_dict['Stride']
-                cfg['padding_filter'] = layer_dict['Padding']
+                cfg['height_input'] = int(layer_dict['Inputsize'][0])
+                cfg['width_input'] = int(layer_dict['Inputsize'][1])
+                cfg['height_output'] = int(layer_dict['Outputsize'][0])
+                cfg['width_output'] = int(layer_dict['Outputsize'][1])
+                cfg['height_filter'] = int(layer_dict['Kernelsize'])
+                cfg['width_filter'] = int(layer_dict['Kernelsize'])
+                cfg['stride_filter'] = int(layer_dict['Stride'])
+                cfg['padding_filter'] = int(layer_dict['Padding'])
+                temp_pooling_latency = pooling_latency_analysis(SimConfig_path=self.sim_config_path,
+                                                        indata=0, rdata=0, outprecision = int(layer_dict['outputbit']),
+                                                        default_inbuf_size = self.tcg_mapping.max_inbuf_size,
+                                                        default_outbuf_size = self.tcg_mapping.max_outbuf_size,
+                                                        default_inchannel = int(layer_dict['Inputchannel']), default_size = (int(layer_dict['Kernelsize'])**2))
+                cfg['computing_time'] = round(temp_pooling_latency.pooling_latency/self.time_slice)
             elif layer_dict['type'] == 'fc':
                 cfg['type'] = 'fc'
-                cfg['height_input'] = layer_dict['Infeature']
+                cfg['height_input'] = int(layer_dict['Infeature']) / int(self.tcg_mapping.net[layer_id-1][0][0]['Outputchannel'])
                 cfg['width_input'] = 0
-                cfg['height_output'] = layer_dict['Outfeature']
+                cfg['height_output'] = int(layer_dict['Outfeature'])
                 cfg['width_output'] = 0
+                temp_tile_latency = tile_latency_analysis(SimConfig_path=self.sim_config_path,
+                                read_row=self.tcg_mapping.layer_tileinfo[layer_id]['max_row'],
+                                read_column=self.tcg_mapping.layer_tileinfo[layer_id]['max_column'],
+                                indata=0, rdata=0, inprecision=int(layer_dict['Inputbit']),
+                                PE_num=self.tcg_mapping.layer_tileinfo[layer_id]['max_PE'],
+                                default_inbuf_size=self.tcg_mapping.max_inbuf_size,
+                                default_outbuf_size=self.tcg_mapping.max_outbuf_size
+                                )
+                cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
             else:
                 self.logger.warn('Unsupported layer type, layer_id:' + str(layer_id))
+            print(cfg['computing_time'])
             if layer_id < self.tcg_mapping.layer_num-1:
                 cfg['length'] = round(int(layer_dict['Outputchannel']) * int(
                     layer_dict['outputbit']) / self.bandwidth / self.time_slice)
@@ -130,7 +155,7 @@ class TimeSliceArray(BaseArray):
                         tile = FCTimeSliceTile((i, j), cfg)
                     elif cfg['type'] == 'pooling':
                         tile = PoolingTimeSliceTile((i, j), cfg)
-                    # print(cfg)
+                    print(cfg)
                     self.tile_dict[tile.tile_id] = tile
         # allocate the wires
         for i in range(self.tcg_mapping.tile_num[0]):
@@ -159,7 +184,6 @@ class TimeSliceArray(BaseArray):
         elif self.layer_cfg[0]['type'] == 'fc':
             for x in range(self.layer_cfg[0]['height_input']):
                 inputs_inits.append((x + 1, -1, -1))
-        # print(inputs_inits)
         for tile_id in self.layer_cfg[0]['tile_id']:
             self.tile_dict[tile_id].update_input(inputs_inits)
 
@@ -232,4 +256,4 @@ class TimeSliceArray(BaseArray):
             self.clock_num = self.clock_num + 1
             # print(self.clock_num)
         # print the simulation time
-        print('Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
+        print('Compute Time: ' + str(self.clock_num * self.time_slice / 1000) + 'us')

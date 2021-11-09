@@ -93,4 +93,6 @@ class TimeSliceRouter(BaseRouter):
                 print('Routed: '+str(tile_data))
                 for path_wire_id in current_path:
                     self.wire_state[path_wire_id] = 1
+            else:
+                print('Route Failed '+str(tile_data))
         return self.paths

@@ -17,7 +17,6 @@ from MNSIM.Interface.interface import *
 from MNSIM.Accuracy_Model.Weight_update import weight_update
 from MNSIM.Mapping_Model.Behavior_mapping import behavior_mapping
 from MNSIM.Mapping_Model.Tile_connection_graph import TCG
-from MNSIM.Latency_Model.Model_latency import Model_latency
 
 
 def _init_component(cfg, registry_name, **addi_args):
