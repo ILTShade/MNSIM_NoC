@@ -37,12 +37,10 @@ class FCTimeSliceTile(TimeSliceTile):
         """
         super().__init__(position, task_cfg)
         # Coordinate of the output under computation on the output feature map
-        self.input_complete = False
+        self.computing_output = False
         self.output_complete = False
 
-    def update_time_slice(self):
-        # Computing process in fc tile
-        # if the tile finishes computing
+    def set_tile_task(self):
         if self.output_complete:
             return
         # if the tile is not computing
@@ -50,13 +48,18 @@ class FCTimeSliceTile(TimeSliceTile):
             # if the input satisfy the requirement
             if len(self.input_list) == self.height_input:
                 self.state = self.computing_time
-                self.input_complete = True
+                self.computing_output = True
+
+    def update_time_slice(self, n):
+        if self.output_complete:
+            return
+        # Computing process in fc tile
         # compute in the time slice
         if self.state > 0:
-            self.state -= 1
+            self.state -= n
         # if the tile just finished the computation
         if self.state == 0:
-            if self.input_complete:
+            if self.computing_output:
                 for i in range(1, self.height_output+1):
                     if self.num_out == 1:
                         self.output_list.append((i, -1))
@@ -73,3 +76,4 @@ class FCTimeSliceTile(TimeSliceTile):
                 # delete all inputs
                 self.input_list = []
                 self.output_complete = True
+                self.computing_output = False

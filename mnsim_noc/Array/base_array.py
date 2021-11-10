@@ -28,5 +28,9 @@ class BaseArray(Component):
         pass
 
     @abstractmethod
+    def get_timeslice_num(self):
+        pass
+
+    @abstractmethod
     def run(self):
         pass

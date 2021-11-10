@@ -28,5 +28,5 @@ class BaseWire(Component):
         pass
 
     @abstractmethod
-    def update_time_slice(self):
+    def update_time_slice(self, n):
         pass

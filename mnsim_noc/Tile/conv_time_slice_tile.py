@@ -51,8 +51,7 @@ class CONVTimeSliceTile(TimeSliceTile):
         # format: (x, y, h)
         self.useless = (0, 0, 0)
 
-    def update_time_slice(self):
-        # Computing process in conv tile
+    def set_tile_task(self):
         # if the tile was not computing
         if self.state == 0:
             # allocate computation task
@@ -84,9 +83,12 @@ class CONVTimeSliceTile(TimeSliceTile):
                     self.next_output = (x_new, y_new)
                     # update state
                     self.state = self.computing_time
+
+    def update_time_slice(self, n):
+        # Computing process in conv tile
         # compute in the time slice
         if self.state > 0:
-            self.state -= 1
+            self.state -= n
         # if the tile just finished the computation
         if self.state == 0:
             if self.computing_output:
