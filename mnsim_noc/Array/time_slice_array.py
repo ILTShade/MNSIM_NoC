@@ -41,6 +41,7 @@ class TimeSliceArray(BaseArray):
         self.wire_dict = dict()
         self.wire_data_transferred = dict()
         self.layer_cfg = []
+        self.next_slice_num = 1
 
     def task_assignment(self):
         # Convert the layer_info
@@ -186,6 +187,7 @@ class TimeSliceArray(BaseArray):
                 inputs_inits.append((x + 1, -1, -1))
         for tile_id in self.layer_cfg[0]['tile_id']:
             self.tile_dict[tile_id].update_input(inputs_inits)
+            self.tile_dict[tile_id].set_tile_task()
 
     def check_finish(self):
         for tile_id, tile in self.tile_dict.items():
@@ -221,6 +223,20 @@ class TimeSliceArray(BaseArray):
                 if wire_data[5]:
                     tile_id = wire_data[2]
                     self.tile_dict[tile_id].update_input([wire_data[0:2] + (wire_data[3],)])
+        for tile_id, tile in self.tile_dict.items():
+            tile.set_tile_task()
+
+    def get_timeslice_num(self):
+        tmp_timeslice_num = float("inf")
+        for tile_id, tile in self.tile_dict.items():
+            if not tile.is_transmitting and tile.output_list and tile.end_tiles:
+                tmp_timeslice_num = min(1, tmp_timeslice_num)
+            if tile.computing_output:
+                tmp_timeslice_num = min(max(1,tile.state), tmp_timeslice_num)
+        for wire_id, wire in self.wire_dict.items():
+            if wire.data:
+                tmp_timeslice_num = min(max(1,wire.state), tmp_timeslice_num)
+        return tmp_timeslice_num
 
     def run(self):
         # task assignment
@@ -229,13 +245,14 @@ class TimeSliceArray(BaseArray):
         while True:
             if self.check_finish():
                 break
+            self.next_slice_num = self.get_timeslice_num()
             # 0, all tile and wire update for one slice
             for tile_id, tile in self.tile_dict.items():
-                tile.update_time_slice()
+                tile.update_time_slice(self.next_slice_num)
             # get the data transferred by wires
             self.wire_data_transferred = dict()
             for wire_id, wire in self.wire_dict.items():
-                self.wire_data_transferred[wire_id] = wire.update_time_slice()
+                self.wire_data_transferred[wire_id] = wire.update_time_slice(self.next_slice_num)
             # 1, update tile input and output
             self.update_tile()
             # 2, get all transfer data
@@ -253,7 +270,7 @@ class TimeSliceArray(BaseArray):
             # 5, set wire task
             self.set_wire_task(routing_result)
             # 6, record clock_num
-            self.clock_num = self.clock_num + 1
+            self.clock_num = self.clock_num + self.next_slice_num
             # print(self.clock_num)
         # print the simulation time
-        print('Compute Time: ' + str(self.clock_num * self.time_slice / 1000) + 'us')
+        print('Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')

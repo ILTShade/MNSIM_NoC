@@ -65,7 +65,11 @@ class TimeSliceTile(BaseTile):
                 self.logger.warn("Error: wrong input layer")
 
     @abstractmethod
-    def update_time_slice(self):
+    def set_tile_task(self):
+        pass
+
+    @abstractmethod
+    def update_time_slice(self, n):
         pass
 
     def update_output(self, outputs):

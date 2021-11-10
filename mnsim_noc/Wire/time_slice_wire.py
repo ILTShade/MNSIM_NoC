@@ -27,16 +27,11 @@ class TimeSliceWire(BaseWire):
         # data Format:(x, y, end_tile_id, layer, is_first, is_last)
         self.data = wire_tasks[0:3] + wire_tasks[4:7]
 
-    def update_time_slice(self):
+    def update_time_slice(self, n):
         if self.state > 0:
-            self.state -= 1
-            if self.state == 0:
-                # return data to update tile
-                tmp_data = self.data
-                self.data = None
-                return tmp_data
-        # consider the transmission within 0 time slice
-        else:
+            self.state -= n
+        if self.state == 0 and self.data:
+            # return data to update tile
             tmp_data = self.data
             self.data = None
             return tmp_data
