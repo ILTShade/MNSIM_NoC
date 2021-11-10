@@ -32,4 +32,11 @@ class TimeSliceWire(BaseWire):
             self.state -= 1
             if self.state == 0:
                 # return data to update tile
-                return self.data
+                tmp_data = self.data
+                self.data = None
+                return tmp_data
+        # consider the transmission within 0 time slice
+        else:
+            tmp_data = self.data
+            self.data = None
+            return tmp_data

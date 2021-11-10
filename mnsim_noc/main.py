@@ -45,7 +45,7 @@ def main():
               help="NN model weights file location & name, default:/MNSIM_NoC/cifar10_vgg8_params.pth")
 @click.option("-D", "--device", default=0,
               help="Determine hardware device for simulation, default: CPU")
-@click.option("--time_slice_span", "-TSS", default=1, help='span of the timeslice in simulation (ns), default: 1')
+@click.option("--time_slice_span", "-TSS", default=10, help='span of the timeslice in simulation (ns), default: 1')
 def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span):
     # load cfg
     # with open(cfg_file, "r") as f:
