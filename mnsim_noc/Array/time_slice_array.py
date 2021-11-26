@@ -29,12 +29,12 @@ class TimeSliceArray(BaseArray):
     '''
     def __init__(self, tcg_mapping, time_slice, sim_config_path):
         super().__init__(tcg_mapping)
-        # 切片时长: ns
+        # span of timeslice: ns
         self.time_slice = time_slice
         self.sim_config_path = sim_config_path
         tcg_config = cp.ConfigParser()
         tcg_config.read(sim_config_path, encoding='UTF-8')
-        # 传输线带宽: Gbps
+        # bandwidth of the wire: Gbps
         self.bandwidth = int(tcg_config.get('Tile level', 'Inter_Tile_Bandwidth'))
         self.clock_num = 0
         self.tile_dict = dict()
@@ -51,10 +51,10 @@ class TimeSliceArray(BaseArray):
             # TODO: extended to support branch
             # can be extended to support branch
             if len(self.tcg_mapping.layer_tileinfo[layer_id]['Inputindex']) > 1:
-                self.logger.warn('Do not support branch')
+                self.logger.warning('Do not support branch')
             cfg['layer_in'] = self.tcg_mapping.layer_tileinfo[layer_id]['Inputindex'][0] + layer_id
             if len(self.tcg_mapping.layer_tileinfo[layer_id]['Outputindex']) > 1:
-                self.logger.warn('Do not support branch')
+                self.logger.warning('Do not support branch')
             elif len(self.tcg_mapping.layer_tileinfo[layer_id]['Outputindex']) == 0:
                 cfg['tile_out'] = -1
             else:
@@ -114,11 +114,11 @@ class TimeSliceArray(BaseArray):
                                 )
                 cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
             else:
-                self.logger.warn('Unsupported layer type, layer_id:' + str(layer_id))
-            print(cfg['computing_time'])
+                self.logger.warning('Unsupported layer type, layer_id:' + str(layer_id))
+            self.logger.info(cfg['computing_time'])
             if layer_id < self.tcg_mapping.layer_num-1:
-                cfg['length'] = round(int(layer_dict['Outputchannel']) * int(
-                    layer_dict['outputbit']) / self.bandwidth / self.time_slice)
+                cfg['length'] = int(layer_dict['Outputchannel']) * int(
+                    layer_dict['outputbit']) / self.bandwidth / self.time_slice
             else:
                 cfg['length'] = 0
             self.layer_cfg.append(cfg)
@@ -156,7 +156,7 @@ class TimeSliceArray(BaseArray):
                         tile = FCTimeSliceTile((i, j), cfg)
                     elif cfg['type'] == 'pooling':
                         tile = PoolingTimeSliceTile((i, j), cfg)
-                    print(cfg)
+                    self.logger.info(cfg)
                     self.tile_dict[tile.tile_id] = tile
         # allocate the wires
         for i in range(self.tcg_mapping.tile_num[0]):
@@ -271,6 +271,5 @@ class TimeSliceArray(BaseArray):
             self.set_wire_task(routing_result)
             # 6, record clock_num
             self.clock_num = self.clock_num + self.next_slice_num
-            # print(self.clock_num)
-        # print the simulation time
-        print('Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
+        # log the simulation time
+        self.logger.info('Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')

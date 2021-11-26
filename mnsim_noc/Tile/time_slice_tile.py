@@ -50,7 +50,7 @@ class TimeSliceTile(BaseTile):
                 self.latest_input = single_input[0:2]
             elif single_input[2] == self.layer_out:
                 if self.num_out == 1:
-                    self.logger.warn("Error: wrong input layer")
+                    self.logger.warning("Error: wrong input layer")
                 elif single_input[0:2] in self.output_to_be_merged:
                     current_num = self.output_to_be_merged[single_input[0:2]]
                     if current_num == self.num_out - 1:
@@ -62,7 +62,7 @@ class TimeSliceTile(BaseTile):
                 else:
                     self.output_to_be_merged[single_input[0:2]] = 1
             else:
-                self.logger.warn("Error: wrong input layer")
+                self.logger.warning("Error: wrong input layer")
 
     @abstractmethod
     def set_tile_task(self):
