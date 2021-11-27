@@ -1,5 +1,5 @@
 # MNSIM_NoC
-**Install MNSIM First !**
+**Install MNSIM(https://github.com/Zhu-Zhenhua/MNSIM_Python.git) First !**
 ### Requirements Install
 ```
 pip install -e .
