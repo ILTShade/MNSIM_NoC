@@ -16,6 +16,7 @@ class BaseArray(Component):
     REGISTRY = "array"
 
     def __init__(self, tcg_mapping):
+        super().__init__()
         self.tcg_mapping = tcg_mapping
         self.tcg_mapping.mapping_net()
         self.tcg_mapping.calculate_transfer_distance()

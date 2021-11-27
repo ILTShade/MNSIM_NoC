@@ -113,3 +113,9 @@ results/
 
 # pth
 *.pth
+
+# pycharm
+.idea/
+
+# pyc
+*.pyc

@@ -42,6 +42,8 @@ class TimeSliceRouter(BaseRouter):
             end_tile_position = list(map(int, re.findall(r"\d+", tile_data[2])))
             step_x = end_tile_position[0]-start_tile_position[0]
             step_y = end_tile_position[1]-start_tile_position[1]
+            length = round(tile_data[3]*(abs(step_x)+abs(step_y)))
+            data = tile_data[0:3]+(length,tile_data[4])
             # North:0; West:1; South:2; East:3;
             direction_x = 2 if step_x > 0 else 0
             direction_y = 3 if step_y > 0 else 1
@@ -89,10 +91,10 @@ class TimeSliceRouter(BaseRouter):
                     continue
                 break
             if current_path:
-                self.paths.append((current_path, tile_data))
-                print('Routed: '+str(tile_data))
+                self.paths.append((current_path, data))
+                self.logger.info('Routed: '+str(data))
                 for path_wire_id in current_path:
                     self.wire_state[path_wire_id] = 1
             else:
-                print('Route Failed '+str(tile_data))
+                self.logger.info('Route Failed '+str(data))
         return self.paths
