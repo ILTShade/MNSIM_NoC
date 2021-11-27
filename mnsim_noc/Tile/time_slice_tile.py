@@ -14,7 +14,7 @@ from mnsim_noc.Tile import BaseTile
 class TimeSliceTile(BaseTile):
     NAME = "time_slice_tile"
 
-    def __init__(self, position, task_cfg):
+    def __init__(self, position, task_cfg, time_slice):
         super().__init__(position, task_cfg)
         # Extract parameters from task_cfg
         self.length = task_cfg['length']
@@ -27,6 +27,8 @@ class TimeSliceTile(BaseTile):
         self.width_output = task_cfg['width_output']
         self.computing_time = task_cfg['computing_time']
         self.end_tiles = task_cfg['end_tiles']
+        # time_slice: span of a time_slice (ns)
+        self.time_slice = time_slice
         # Number of outputs for a certain node in input feature map
         self.output_to_be_merged = dict()
         # Coordinate of the latest input on the input feature map
@@ -65,7 +67,7 @@ class TimeSliceTile(BaseTile):
                 self.logger.warning("Error: wrong input layer")
 
     @abstractmethod
-    def set_tile_task(self):
+    def set_tile_task(self, clock_num):
         pass
 
     @abstractmethod

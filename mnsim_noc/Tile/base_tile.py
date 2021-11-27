@@ -15,6 +15,7 @@ class BaseTile(Component):
     REGISTRY = "tile"
 
     def __init__(self, position, task_cfg):
+        super().__init__()
         # input and output data
         # format: (start_tile_id, end_tile_id, layer, x, y, length)
         self.position = position

@@ -115,7 +115,7 @@ class TimeSliceArray(BaseArray):
                 cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
             else:
                 self.logger.warning('Unsupported layer type, layer_id:' + str(layer_id))
-            self.logger.info(cfg['computing_time'])
+            # self.logger.info(cfg['computing_time'])
             if layer_id < self.tcg_mapping.layer_num-1:
                 cfg['length'] = int(layer_dict['Outputchannel']) * int(
                     layer_dict['outputbit']) / self.bandwidth / self.time_slice
@@ -151,12 +151,12 @@ class TimeSliceArray(BaseArray):
                         cfg['length'] = round(cfg['length'] / cfg['tile_num'])
                     # different tile types
                     if cfg['type'] == 'conv':
-                        tile = CONVTimeSliceTile((i, j), cfg)
+                        tile = CONVTimeSliceTile((i, j), cfg, self.time_slice)
                     elif cfg['type'] == 'fc':
-                        tile = FCTimeSliceTile((i, j), cfg)
+                        tile = FCTimeSliceTile((i, j), cfg, self.time_slice)
                     elif cfg['type'] == 'pooling':
-                        tile = PoolingTimeSliceTile((i, j), cfg)
-                    self.logger.info(cfg)
+                        tile = PoolingTimeSliceTile((i, j), cfg, self.time_slice)
+                    # self.logger.info(cfg)
                     self.tile_dict[tile.tile_id] = tile
         # allocate the wires
         for i in range(self.tcg_mapping.tile_num[0]):
@@ -175,7 +175,7 @@ class TimeSliceArray(BaseArray):
                     wire = TimeSliceWire((i, j, 3))
                     self.wire_dict[wire.wire_id] = wire
         # allocate the router
-        self.router = TimeSliceRouter()
+        self.router = TimeSliceRouter(self.time_slice)
         # distribute inputs for tiles in layer_0
         inputs_inits = []
         if self.layer_cfg[0]['type'] == 'conv' or self.layer_cfg[0]['type'] == 'pooling':
@@ -187,7 +187,7 @@ class TimeSliceArray(BaseArray):
                 inputs_inits.append((x + 1, -1, -1))
         for tile_id in self.layer_cfg[0]['tile_id']:
             self.tile_dict[tile_id].update_input(inputs_inits)
-            self.tile_dict[tile_id].set_tile_task()
+            self.tile_dict[tile_id].set_tile_task(self.clock_num)
 
     def check_finish(self):
         for tile_id, tile in self.tile_dict.items():
@@ -224,7 +224,7 @@ class TimeSliceArray(BaseArray):
                     tile_id = wire_data[2]
                     self.tile_dict[tile_id].update_input([wire_data[0:2] + (wire_data[3],)])
         for tile_id, tile in self.tile_dict.items():
-            tile.set_tile_task()
+            tile.set_tile_task(self.clock_num)
 
     def get_timeslice_num(self):
         tmp_timeslice_num = float("inf")
@@ -266,10 +266,10 @@ class TimeSliceArray(BaseArray):
                 wire_state[wire_id] = wire.state
             # 4, routing
             # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
-            routing_result = self.router.assign(transfer_data, wire_state)
+            routing_result = self.router.assign(transfer_data, wire_state, self.clock_num)
             # 5, set wire task
             self.set_wire_task(routing_result)
             # 6, record clock_num
             self.clock_num = self.clock_num + self.next_slice_num
         # log the simulation time
-        self.logger.info('Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
+        self.logger.info('(Finish) Total Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')

@@ -13,7 +13,7 @@ from mnsim_noc.Tile import TimeSliceTile
 class FCTimeSliceTile(TimeSliceTile):
     NAME = "fc_time_slice_tile"
 
-    def __init__(self, position, task_cfg):
+    def __init__(self, position, task_cfg, time_slice):
         # input and output data
         # format: (start_tile_id, end_tile_id, layer, x, y, length)
         """
@@ -35,12 +35,12 @@ class FCTimeSliceTile(TimeSliceTile):
             end_tiles:
                 List of id of tiles where the outputs should be sent to
         """
-        super().__init__(position, task_cfg)
+        super().__init__(position, task_cfg, time_slice)
         # Coordinate of the output under computation on the output feature map
         self.computing_output = False
         self.output_complete = False
 
-    def set_tile_task(self):
+    def set_tile_task(self, clock_num):
         if self.output_complete:
             return
         # if the tile is not computing
@@ -49,6 +49,8 @@ class FCTimeSliceTile(TimeSliceTile):
             if len(self.input_list) == self.height_input:
                 self.state = self.computing_time
                 self.computing_output = True
+                # log the computing time(ns)
+                self.logger.info('(Compute) layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id))
 
     def update_time_slice(self, n):
         if self.output_complete:
