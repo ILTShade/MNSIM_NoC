@@ -13,7 +13,7 @@ from mnsim_noc.Tile import TimeSliceTile
 class CONVTimeSliceTile(TimeSliceTile):
     NAME = "conv_time_slice_tile"
 
-    def __init__(self, position, task_cfg):
+    def __init__(self, position, task_cfg, time_slice):
         # input and output data
         # format: (start_tile_id, end_tile_id, layer, x, y, length)
         """
@@ -37,7 +37,7 @@ class CONVTimeSliceTile(TimeSliceTile):
             end_tiles:
                 List of id of tiles where the outputs should be sent to
         """
-        super().__init__(position, task_cfg)
+        super().__init__(position, task_cfg, time_slice)
         # Extract parameters from task_cfg
         self.height_core = task_cfg['height_core']
         self.width_core = task_cfg['width_core']
@@ -51,7 +51,7 @@ class CONVTimeSliceTile(TimeSliceTile):
         # format: (x, y, h)
         self.useless = (0, 0, 0)
 
-    def set_tile_task(self):
+    def set_tile_task(self, clock_num):
         # if the tile was not computing
         if self.state == 0:
             # allocate computation task
@@ -77,6 +77,8 @@ class CONVTimeSliceTile(TimeSliceTile):
                     self.useless = (x_useless, y_useless, h_useless)
                     # update self.computing_output
                     self.computing_output = self.next_output
+                    # log the computing time(ns)
+                    self.logger.info('(Compute) layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id))
                     # update self.next_output
                     x_new = (self.next_output[0] * self.width_output + self.next_output[1]) // self.width_output
                     y_new = (self.next_output[0] * self.width_output + self.next_output[1]) % self.width_output + 1

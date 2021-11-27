@@ -14,16 +14,19 @@ from mnsim_noc.Router import BaseRouter
 class TimeSliceRouter(BaseRouter):
     NAME = "time_slice_tile"
 
-    def __init__(self):
+    def __init__(self, time_slice):
         super().__init__()
         self.wire_state = None
         self.paths = []
+        # time_slice: span of a time_slice (ns)
+        self.time_slice = time_slice
 
-    def assign(self, transfer_data, wire_state):
+    def assign(self, transfer_data, wire_state, clock_num):
         """
         input:
             transfer_data: dict()[tile_id->tile.output]
             wire_state: dict()[wire_id->wire.state]
+            clock_num: current clock_num in simulation
         Output:
             routing results: paths
         """
@@ -92,9 +95,10 @@ class TimeSliceRouter(BaseRouter):
                 break
             if current_path:
                 self.paths.append((current_path, data))
-                self.logger.info('Routed: '+str(data))
+                # log the transfer layer and time(ns)
+                self.logger.info('(Transfer) layer:'+str(data[4])+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+data[3])*self.time_slice))
                 for path_wire_id in current_path:
                     self.wire_state[path_wire_id] = 1
             else:
-                self.logger.info('Route Failed '+str(data))
+                self.logger.info('(Rejected Routing) layer:'+str(data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2]))
         return self.paths
