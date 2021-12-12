@@ -42,6 +42,8 @@ class TimeSliceArray(BaseArray):
         self.wire_data_transferred = dict()
         self.layer_cfg = []
         self.next_slice_num = 1
+        self.roofline = 0
+        self.roofline_constrain = []
 
     def task_assignment(self):
         # Convert the layer_info
@@ -238,6 +240,22 @@ class TimeSliceArray(BaseArray):
                 tmp_timeslice_num = min(max(1,wire.state), tmp_timeslice_num)
         return tmp_timeslice_num
 
+    def get_roofline(self):
+        for tile_id, tile in self.tile_dict.items():
+            tmp_roofline = tile.get_roofline()
+            if tmp_roofline > self.roofline:
+                self.roofline_constrain = ['Tile: '+tile_id]
+                self.roofline = tmp_roofline
+            elif tmp_roofline == self.roofline:
+                self.roofline_constrain.append('Tile: '+tile_id)
+        for wire_id, wire in self.wire_dict.items():
+            tmp_roofline = wire.get_roofline()
+            if tmp_roofline > self.roofline:
+                self.roofline_constrain = ['Wire: '+wire_id]
+                self.roofline = tmp_roofline
+            elif tmp_roofline == self.roofline:
+                self.roofline_constrain.append('Wire: '+wire_id)
+
     def run(self):
         # task assignment
         self.task_assignment()
@@ -271,5 +289,10 @@ class TimeSliceArray(BaseArray):
             self.set_wire_task(routing_result)
             # 6, record clock_num
             self.clock_num = self.clock_num + self.next_slice_num
+        self.get_roofline()
         # log the simulation time
         self.logger.info('(Finish) Total Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
+        # log the roofline
+        self.logger.info('(Upper Bound) Theoretically Shortest Compute Time: ' + str(self.roofline * self.time_slice) + 'ns')
+        self.logger.info('(Upper Bound) Theoretically Critical Constrains: ' + str(self.roofline_constrain))
+        self.logger.info('(Upper Bound) Actual Utilization Ratio: ' + str(self.roofline / self.clock_num * 100) + '%')
