@@ -63,6 +63,7 @@ class FCTimeSliceTile(TimeSliceTile):
         if self.state == 0:
             if self.computing_output:
                 for i in range(1, self.height_output+1):
+                    self.computed_data += self.length
                     if self.num_out == 1:
                         self.output_list.append((i, -1))
                     elif (i, -1) in self.output_to_be_merged:

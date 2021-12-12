@@ -12,7 +12,7 @@ from mnsim_noc.Tile import BaseTile
 
 
 class TimeSliceTile(BaseTile):
-    NAME = "time_slice_tile"
+    REGISTRY = "time_slice_tile"
 
     def __init__(self, position, task_cfg, time_slice):
         super().__init__(position, task_cfg)
@@ -37,6 +37,8 @@ class TimeSliceTile(BaseTile):
         self.current_end_tiles = self.end_tiles[:]
         # whether the tile is transmitting data or not
         self.is_transmitting = False
+        # data computed during the simulation
+        self.computed_data = 0
 
     def update_input(self, inputs):
         # Update the input_list with new inputs
@@ -95,3 +97,10 @@ class TimeSliceTile(BaseTile):
         if self.output_list and self.current_end_tiles and not self.is_transmitting:
             output = self.output_list[0]
             return output[0], output[1], self.current_end_tiles[0], self.length, self.layer_out
+
+    def get_roofline(self):
+        # return the actual time needed for the computation
+        if self.computed_data > 0:
+            return round(self.computed_data * self.computing_time / self.length)
+        else: 
+            return 0
