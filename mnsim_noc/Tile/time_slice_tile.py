@@ -27,6 +27,7 @@ class TimeSliceTile(BaseTile):
         self.width_output = task_cfg['width_output']
         self.computing_time = task_cfg['computing_time']
         self.end_tiles = task_cfg['end_tiles']
+        self.data_length = task_cfg['data_length']
         # time_slice: span of a time_slice (ns)
         self.time_slice = time_slice
         # Number of outputs for a certain node in input feature map
@@ -101,6 +102,6 @@ class TimeSliceTile(BaseTile):
     def get_roofline(self):
         # return the actual time needed for the computation
         if self.computed_data > 0:
-            return round(self.computed_data * self.computing_time / self.length)
+            return [round(self.computed_data * self.computing_time / self.data_length), self.computed_data, self.data_length, self.computing_time]
         else: 
-            return 0
+            return []

@@ -94,7 +94,7 @@ class PoolingTimeSliceTile(TimeSliceTile):
         # if the tile just finished the computation
         if self.state == 0:
             if self.computing_output:
-                self.computed_data += self.length
+                self.computed_data += self.data_length
                 if self.num_out == 1:
                     self.output_list.append(self.computing_output)
                 elif self.computing_output in self.output_to_be_merged:

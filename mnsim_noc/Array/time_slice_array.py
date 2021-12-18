@@ -12,7 +12,10 @@
 from copy import copy
 import re
 import copy
+import math
 import configparser as cp
+import matplotlib.pyplot as plt
+import numpy as np
 from mnsim_noc.Array import BaseArray
 from mnsim_noc.Tile import FCTimeSliceTile, CONVTimeSliceTile, PoolingTimeSliceTile
 from mnsim_noc.Wire import TimeSliceWire
@@ -44,6 +47,9 @@ class TimeSliceArray(BaseArray):
         self.next_slice_num = 1
         self.roofline = 0
         self.roofline_constrain = []
+        self.roofline_record = []
+        self.total_computing_power = 0
+        self.total_data_size = 0
 
     def task_assignment(self):
         # Convert the layer_info
@@ -144,6 +150,7 @@ class TimeSliceArray(BaseArray):
                         else:
                             cfg['end_tiles'] = self.layer_cfg[cfg['tile_out']]['tile_id']
                         cfg['num_out'] = cfg['tile_num']
+                        cfg['data_length'] = round(cfg['length'] / cfg['tile_num'])
                     else:
                         if layer_id == self.tcg_mapping.layer_num-1:
                             cfg['end_tiles'] = []
@@ -151,6 +158,7 @@ class TimeSliceArray(BaseArray):
                             cfg['end_tiles'] = ["{}_{}".format(int(cfg['aggregate_arg'][0]), int(cfg['aggregate_arg'][1]))]
                         cfg['num_out'] = 1
                         cfg['length'] = round(cfg['length'] / cfg['tile_num'])
+                        cfg['data_length'] = cfg['length']
                     # different tile types
                     if cfg['type'] == 'conv':
                         tile = CONVTimeSliceTile((i, j), cfg, self.time_slice)
@@ -243,18 +251,44 @@ class TimeSliceArray(BaseArray):
     def get_roofline(self):
         for tile_id, tile in self.tile_dict.items():
             tmp_roofline = tile.get_roofline()
-            if tmp_roofline > self.roofline:
-                self.roofline_constrain = ['Tile: '+tile_id]
-                self.roofline = tmp_roofline
-            elif tmp_roofline == self.roofline:
-                self.roofline_constrain.append('Tile: '+tile_id)
+            if tmp_roofline:
+                if tmp_roofline[0] > self.roofline:
+                    self.roofline_constrain = ['Tile_'+tile_id]
+                    self.roofline = tmp_roofline[0]
+                elif tmp_roofline[0] == self.roofline:
+                    self.roofline_constrain.append('Tile_'+tile_id)
+                # record the upperbound for painting
+                self.roofline_record.append((tmp_roofline[0],'Tile_'+tile_id,'r'))
+                # add the computing power and data size
+                self.total_computing_power += tmp_roofline[2]/tmp_roofline[3]
+                self.total_data_size += tmp_roofline[1]
         for wire_id, wire in self.wire_dict.items():
             tmp_roofline = wire.get_roofline()
-            if tmp_roofline > self.roofline:
-                self.roofline_constrain = ['Wire: '+wire_id]
-                self.roofline = tmp_roofline
-            elif tmp_roofline == self.roofline:
-                self.roofline_constrain.append('Wire: '+wire_id)
+            if tmp_roofline:
+                if tmp_roofline > self.roofline:
+                    self.roofline_constrain = ['Wire_'+wire_id]
+                    self.roofline = tmp_roofline
+                elif tmp_roofline == self.roofline:
+                    self.roofline_constrain.append('Wire_'+wire_id)
+                # record the upperbound for painting
+                self.roofline_record.append((tmp_roofline,'Wire_'+wire_id,'b'))
+
+    def paint_roofline(self):
+        L = len(self.roofline_record)
+        X=np.linspace(0,L,20*L)
+        Y=np.linspace(self.roofline,self.roofline,20*L)
+        plt.plot(X,Y,color='g')
+        plt.text(L-50,self.roofline,'Total UpperBound')
+        Y=np.linspace(round(self.total_data_size/self.total_computing_power),round(self.total_data_size/self.total_computing_power),20*L)
+        plt.plot(X,Y,color='g')
+        plt.text(L-50,round(self.total_data_size/self.total_computing_power),'Compute UpperBound')
+        for i, item in enumerate(self.roofline_record):
+            tmp_X = np.linspace(i,i+0.5,10)
+            tmp_Y = np.linspace(item[0],item[0],10)
+            plt.plot(tmp_X,tmp_Y,color=item[2])
+            plt.yscale('log')
+            # plt.text(i+1.2,item[0],item[1])
+        plt.savefig('upperbound.png')
 
     def run(self):
         # task assignment
@@ -290,6 +324,7 @@ class TimeSliceArray(BaseArray):
             # 6, record clock_num
             self.clock_num = self.clock_num + self.next_slice_num
         self.get_roofline()
+        self.paint_roofline()
         # log the simulation time
         self.logger.info('(Finish) Total Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
         # log the roofline
