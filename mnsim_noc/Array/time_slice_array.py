@@ -305,24 +305,24 @@ class TimeSliceArray(BaseArray):
             self.wire_data_transferred = dict()
             for wire_id, wire in self.wire_dict.items():
                 self.wire_data_transferred[wire_id] = wire.update_time_slice(self.next_slice_num)
-            # 1, update tile input and output
+            # 1, record clock_num
+            self.clock_num = self.clock_num + self.next_slice_num
+            # 2, update tile input and output
             self.update_tile()
-            # 2, get all transfer data
+            # 3, get all transfer data
             transfer_data = dict()
             for tile_id, tile in self.tile_dict.items():
                 # transfer_data format: (x, y, end_tile_id, length, layer_out)
                 transfer_data[tile_id] = tile.get_output()
-            # 3, get all wire state
+            # 4, get all wire state
             wire_state = dict()
             for wire_id, wire in self.wire_dict.items():
                 wire_state[wire_id] = wire.state
-            # 4, routing
+            # 5, routing
             # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
             routing_result = self.router.assign(transfer_data, wire_state, self.clock_num)
-            # 5, set wire task
+            # 6, set wire task
             self.set_wire_task(routing_result)
-            # 6, record clock_num
-            self.clock_num = self.clock_num + self.next_slice_num
         self.get_roofline()
         self.paint_roofline()
         # log the simulation time
