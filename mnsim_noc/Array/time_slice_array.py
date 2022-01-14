@@ -30,7 +30,7 @@ class TimeSliceArray(BaseArray):
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
-    def __init__(self, tcg_mapping, time_slice, sim_config_path):
+    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth):
         super().__init__(tcg_mapping)
         # span of timeslice: ns
         self.time_slice = time_slice
@@ -38,7 +38,8 @@ class TimeSliceArray(BaseArray):
         tcg_config = cp.ConfigParser()
         tcg_config.read(sim_config_path, encoding='UTF-8')
         # bandwidth of the wire: Gbps
-        self.bandwidth = int(tcg_config.get('Tile level', 'Inter_Tile_Bandwidth'))
+        self.bandwidth = float(tcg_config.get('Tile level', 'Inter_Tile_Bandwidth'))
+        # self.bandwidth  = int(inter_tile_bandwidth)
         self.clock_num = 0
         self.tile_dict = dict()
         self.wire_dict = dict()
@@ -211,7 +212,7 @@ class TimeSliceArray(BaseArray):
     def set_wire_task(self, routing_result):
         # task format: (x, y, end_tile_id, length, layer, is_first, is_last)
         # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
-        for path in routing_result:
+        for path in routing_result[0]:
             wire_list = path[0]
             path_data = path[1]
             wire_len = len(wire_list)
@@ -221,6 +222,8 @@ class TimeSliceArray(BaseArray):
                 is_first = (index == 0)
                 is_last = (index == wire_len - 1)
                 self.wire_dict[wire_id].set_wire_task(path_data + (is_first, is_last))
+        for refused in routing_result[1]:
+            self.tile_dict[refused[0]].set_back_time(refused[1])
 
     def update_tile(self):
         for wire_id, wire_data in self.wire_data_transferred.items():
@@ -240,7 +243,7 @@ class TimeSliceArray(BaseArray):
         tmp_timeslice_num = float("inf")
         for tile_id, tile in self.tile_dict.items():
             if not tile.is_transmitting and tile.output_list and tile.end_tiles:
-                tmp_timeslice_num = min(1, tmp_timeslice_num)
+                tmp_timeslice_num = min(max(1,tile.backtime), tmp_timeslice_num)
             if tile.computing_output:
                 tmp_timeslice_num = min(max(1,tile.state), tmp_timeslice_num)
         for wire_id, wire in self.wire_dict.items():

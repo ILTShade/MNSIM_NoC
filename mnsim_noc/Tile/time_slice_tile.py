@@ -40,6 +40,8 @@ class TimeSliceTile(BaseTile):
         self.is_transmitting = False
         # data computed during the simulation
         self.computed_data = 0
+        # backtime for next transition
+        self.backtime = 0
 
     def update_input(self, inputs):
         # Update the input_list with new inputs
@@ -95,7 +97,7 @@ class TimeSliceTile(BaseTile):
     def get_output(self):
         # return the output to be transmitted through wires
         # outputs format: (x, y, end_tile_id, length, layer_out)
-        if self.output_list and self.current_end_tiles and not self.is_transmitting:
+        if self.output_list and self.current_end_tiles and not self.is_transmitting and self.backtime==0:
             output = self.output_list[0]
             return output[0], output[1], self.current_end_tiles[0], self.length, self.layer_out
 
@@ -105,3 +107,6 @@ class TimeSliceTile(BaseTile):
             return [round(self.computed_data * self.computing_time / self.data_length), self.computed_data, self.data_length, self.computing_time]
         else: 
             return []
+
+    def set_back_time(self, backtime):
+        self.backtime = backtime

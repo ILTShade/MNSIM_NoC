@@ -18,6 +18,7 @@ class TimeSliceRouter(BaseRouter):
         super().__init__()
         self.wire_state = None
         self.paths = []
+        self.refused = []
         # time_slice: span of a time_slice (ns)
         self.time_slice = time_slice
 
@@ -28,11 +29,13 @@ class TimeSliceRouter(BaseRouter):
             wire_state: dict()[wire_id->wire.state]
             clock_num: current clock_num in simulation
         Output:
-            routing results: paths
+            (routing results: paths, refused routing with backtime)
         """
         # All paths arranged
         # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
         self.paths = []
+        # refused routing format: (start_tile_id, backtime)
+        self.refused = []
         # mark the occupation during routing
         self.wire_state = wire_state
         for start_tile_id, tile_data in transfer_data.items():
@@ -53,12 +56,15 @@ class TimeSliceRouter(BaseRouter):
             # Routing algorithm: first in x, then in y, last in x, choose the first possible path
             # Search for possible paths
             current_path = []
+            backtime = float("inf")
             for i in range(0, abs(step_x)+1):
                 current_position = start_tile_position
                 path_failed = False
+                backtime_tmp = 0
                 # go i steps in x
                 for j in range(1, i+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
+                    backtime_tmp = max(backtime_tmp, self.wire_state[current_wire_id])
                     if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
                         current_position[0] += 1
@@ -67,10 +73,12 @@ class TimeSliceRouter(BaseRouter):
                         break
                 if path_failed:
                     current_path.clear()
+                    backtime = min(backtime, backtime_tmp)
                     continue
                 # go in y
                 for j in range(1, abs(step_y)+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_y)
+                    backtime_tmp = max(backtime_tmp, self.wire_state[current_wire_id])
                     if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
                         current_position[1] += 1
@@ -79,10 +87,12 @@ class TimeSliceRouter(BaseRouter):
                         break
                 if path_failed:
                     current_path.clear()
+                    backtime = min(backtime, backtime_tmp)
                     continue
                 # go abs(step_x)-i steps in x
                 for j in range(1, abs(step_x)-i+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
+                    backtime_tmp = max(backtime_tmp, self.wire_state[current_wire_id])
                     if self.wire_state[current_wire_id] == 0:
                         current_path.append(current_wire_id)
                         current_position[0] += 1
@@ -91,6 +101,7 @@ class TimeSliceRouter(BaseRouter):
                         break
                 if path_failed:
                     current_path.clear()
+                    backtime = min(backtime, backtime_tmp)
                     continue
                 break
             if current_path:
@@ -100,5 +111,6 @@ class TimeSliceRouter(BaseRouter):
                 for path_wire_id in current_path:
                     self.wire_state[path_wire_id] = 1
             else:
+                self.refused.append((start_tile_id, int(backtime)))
                 self.logger.info('(Rejected Routing) layer:'+str(data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2]))
-        return self.paths
+        return self.paths, self.refused
