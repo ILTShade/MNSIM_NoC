@@ -30,7 +30,7 @@ class TimeSliceArray(BaseArray):
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
-    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth):
+    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, tile_cache_size):
         super().__init__(tcg_mapping)
         # span of timeslice: ns
         self.time_slice = time_slice
@@ -51,8 +51,10 @@ class TimeSliceArray(BaseArray):
         self.roofline_record = []
         self.total_computing_power = 0
         self.total_data_size = 0
+        self.tile_cache_size = tile_cache_size
 
     def task_assignment(self):
+        # save the data length from previous layer
         # Convert the layer_info
         for layer_id in range(self.tcg_mapping.layer_num):
             layer_dict = self.tcg_mapping.net[layer_id][0][0]
@@ -129,7 +131,14 @@ class TimeSliceArray(BaseArray):
                 cfg['length'] = int(layer_dict['Outputchannel']) * int(
                     layer_dict['outputbit']) / self.bandwidth / self.time_slice
             else:
-                cfg['length'] = 0
+                cfg['length'] = 1
+            cfg['cache'] = round(int(self.tile_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
+            if layer_id > 0:
+                last_layer_dict = self.tcg_mapping.net[layer_id-1][0][0]
+                cfg['input_length'] = round(int(last_layer_dict['Outputchannel']) * int(
+                    last_layer_dict['outputbit']) / self.bandwidth / self.time_slice)
+            else:
+                cfg['input_length'] = 0
             self.layer_cfg.append(cfg)
         # generate tile_ids and aggregate_arg for layers
         for i in range(self.tcg_mapping.tile_num[0]):
@@ -314,16 +323,18 @@ class TimeSliceArray(BaseArray):
             self.update_tile()
             # 3, get all transfer data
             transfer_data = dict()
+            tile_state = dict()
             for tile_id, tile in self.tile_dict.items():
                 # transfer_data format: (x, y, end_tile_id, length, layer_out)
                 transfer_data[tile_id] = tile.get_output()
+                tile_state[tile_id] = (tile.input_cache_full(), tile.state)
             # 4, get all wire state
             wire_state = dict()
             for wire_id, wire in self.wire_dict.items():
                 wire_state[wire_id] = wire.state
             # 5, routing
             # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
-            routing_result = self.router.assign(transfer_data, wire_state, self.clock_num)
+            routing_result = self.router.assign(transfer_data, wire_state, tile_state, self.clock_num)
             # 6, set wire task
             self.set_wire_task(routing_result)
         self.get_roofline()

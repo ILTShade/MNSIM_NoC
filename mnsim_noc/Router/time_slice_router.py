@@ -22,11 +22,12 @@ class TimeSliceRouter(BaseRouter):
         # time_slice: span of a time_slice (ns)
         self.time_slice = time_slice
 
-    def assign(self, transfer_data, wire_state, clock_num):
+    def assign(self, transfer_data, wire_state, tile_state, clock_num):
         """
         input:
             transfer_data: dict()[tile_id->tile.output]
             wire_state: dict()[wire_id->wire.state]
+            tile_state: dict()[tile_id->(tile_input_cahe_is_full,tile.state)]
             clock_num: current clock_num in simulation
         Output:
             (routing results: paths, refused routing with backtime)
@@ -43,6 +44,11 @@ class TimeSliceRouter(BaseRouter):
                 continue
             # tile_data format:
             # (x, y, end_tile_id, length, layer_out)
+            tile_input_cache_state = tile_state[tile_data[2]]
+            if tile_input_cache_state[0]:
+                self.refused.append((start_tile_id, tile_input_cache_state[1]))
+                self.logger.info('(Input Cache Occupied) layer:'+str(tile_data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data[2]))
+                continue
             # extract tile position from id
             start_tile_position = list(map(int, re.findall(r"\d+", start_tile_id)))
             end_tile_position = list(map(int, re.findall(r"\d+", tile_data[2])))
@@ -112,5 +118,5 @@ class TimeSliceRouter(BaseRouter):
                     self.wire_state[path_wire_id] = 1
             else:
                 self.refused.append((start_tile_id, int(backtime)))
-                self.logger.info('(Rejected Routing) layer:'+str(data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2]))
+                self.logger.info('(Wire Occupied) layer:'+str(data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2]))
         return self.paths, self.refused

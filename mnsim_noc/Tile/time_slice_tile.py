@@ -28,6 +28,9 @@ class TimeSliceTile(BaseTile):
         self.computing_time = task_cfg['computing_time']
         self.end_tiles = task_cfg['end_tiles']
         self.data_length = task_cfg['data_length']
+        self.input_length = task_cfg['input_length']
+        # cache size
+        self.cache_size = task_cfg['cache']
         # time_slice: span of a time_slice (ns)
         self.time_slice = time_slice
         # Number of outputs for a certain node in input feature map
@@ -109,4 +112,9 @@ class TimeSliceTile(BaseTile):
             return []
 
     def set_back_time(self, backtime):
+        # avoid the meaninglessly repeated communication requests
         self.backtime = backtime
+
+    def input_cache_full(self):
+        # whether the input cache is full
+        return self.cache_size < self.input_length * (len(self.input_list) + 1)
