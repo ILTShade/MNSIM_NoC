@@ -48,7 +48,8 @@ def main():
 @click.option("--time_slice_span", "-TSS", default=1, help='span of the timeslice in simulation (ns), default: 1')
 @click.option("--inter_tile_bandwidth", "-ITB", default=20, help='inter_tile_bandwidth (Gbps), default: 20')
 @click.option("--tile_cache_size", "-TCS", default=64, help='tile_cache_size (KB), default: 64')
-def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span, inter_tile_bandwidth, tile_cache_size):
+@click.option("--packet_size", "-PKS", default=10, help='packet size(B), default: 10')
+def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span, inter_tile_bandwidth, tile_cache_size, packet_size):
     # load cfg
     # with open(cfg_file, "r") as f:
     #     cfg = yaml.safe_load(f)
@@ -57,6 +58,6 @@ def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span
     structure_file = __TestInterface.get_structure()
     TCG_mapping = TCG(structure_file, hardware_description, False)
     print('start NoC simulation')
-    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, tile_cache_size)
+    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, tile_cache_size, packet_size)
     # run the sim
     array.run()

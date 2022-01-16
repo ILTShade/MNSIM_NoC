@@ -15,6 +15,7 @@ class BaseWire(Component):
     REGISTRY = "wire"
 
     def __init__(self, position):
+        super().__init__()
         self.position = position
         self.wire_id = BaseWire.get_wire_id(position)
 
