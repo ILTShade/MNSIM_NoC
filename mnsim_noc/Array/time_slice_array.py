@@ -30,7 +30,7 @@ class TimeSliceArray(BaseArray):
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
-    def __init__(self, tcg_mapping, time_slice, sim_config_path):
+    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, tile_cache_size, packet_size):
         super().__init__(tcg_mapping)
         # span of timeslice: ns
         self.time_slice = time_slice
@@ -38,7 +38,8 @@ class TimeSliceArray(BaseArray):
         tcg_config = cp.ConfigParser()
         tcg_config.read(sim_config_path, encoding='UTF-8')
         # bandwidth of the wire: Gbps
-        self.bandwidth = int(tcg_config.get('Tile level', 'Inter_Tile_Bandwidth'))
+        self.bandwidth = float(tcg_config.get('Tile level', 'Inter_Tile_Bandwidth'))
+        # self.bandwidth  = int(inter_tile_bandwidth)
         self.clock_num = 0
         self.tile_dict = dict()
         self.wire_dict = dict()
@@ -50,8 +51,11 @@ class TimeSliceArray(BaseArray):
         self.roofline_record = []
         self.total_computing_power = 0
         self.total_data_size = 0
+        self.tile_cache_size = tile_cache_size
+        self.packet_delay = round(float(packet_size) * 8 / self.bandwidth / self.time_slice)
 
     def task_assignment(self):
+        # save the data length from previous layer
         # Convert the layer_info
         for layer_id in range(self.tcg_mapping.layer_num):
             layer_dict = self.tcg_mapping.net[layer_id][0][0]
@@ -128,7 +132,14 @@ class TimeSliceArray(BaseArray):
                 cfg['length'] = int(layer_dict['Outputchannel']) * int(
                     layer_dict['outputbit']) / self.bandwidth / self.time_slice
             else:
-                cfg['length'] = 0
+                cfg['length'] = 1
+            cfg['cache'] = round(int(self.tile_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
+            if layer_id > 0:
+                last_layer_dict = self.tcg_mapping.net[layer_id-1][0][0]
+                cfg['input_length'] = round(int(last_layer_dict['Outputchannel']) * int(
+                    last_layer_dict['outputbit']) / self.bandwidth / self.time_slice)
+            else:
+                cfg['input_length'] = 0
             self.layer_cfg.append(cfg)
         # generate tile_ids and aggregate_arg for layers
         for i in range(self.tcg_mapping.tile_num[0]):
@@ -185,7 +196,7 @@ class TimeSliceArray(BaseArray):
                     wire = TimeSliceWire((i, j, 3))
                     self.wire_dict[wire.wire_id] = wire
         # allocate the router
-        self.router = TimeSliceRouter(self.time_slice)
+        self.router = TimeSliceRouter(self.time_slice, self.packet_delay)
         # distribute inputs for tiles in layer_0
         inputs_inits = []
         if self.layer_cfg[0]['type'] == 'conv' or self.layer_cfg[0]['type'] == 'pooling':
@@ -211,7 +222,7 @@ class TimeSliceArray(BaseArray):
     def set_wire_task(self, routing_result):
         # task format: (x, y, end_tile_id, length, layer, is_first, is_last)
         # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
-        for path in routing_result:
+        for path in routing_result[0]:
             wire_list = path[0]
             path_data = path[1]
             wire_len = len(wire_list)
@@ -220,7 +231,9 @@ class TimeSliceArray(BaseArray):
             for index, wire_id in enumerate(wire_list):
                 is_first = (index == 0)
                 is_last = (index == wire_len - 1)
-                self.wire_dict[wire_id].set_wire_task(path_data + (is_first, is_last))
+                self.wire_dict[wire_id].set_wire_task(path_data + (is_first, is_last), index * self.packet_delay)
+        for refused in routing_result[1]:
+            self.tile_dict[refused[0]].set_back_time(refused[1])
 
     def update_tile(self):
         for wire_id, wire_data in self.wire_data_transferred.items():
@@ -240,12 +253,14 @@ class TimeSliceArray(BaseArray):
         tmp_timeslice_num = float("inf")
         for tile_id, tile in self.tile_dict.items():
             if not tile.is_transmitting and tile.output_list and tile.end_tiles:
-                tmp_timeslice_num = min(1, tmp_timeslice_num)
+                tmp_timeslice_num = min(max(1,tile.backtime), tmp_timeslice_num)
             if tile.computing_output:
                 tmp_timeslice_num = min(max(1,tile.state), tmp_timeslice_num)
         for wire_id, wire in self.wire_dict.items():
             if wire.data:
                 tmp_timeslice_num = min(max(1,wire.state), tmp_timeslice_num)
+            if wire.next_data:
+                tmp_timeslice_num = min(max(1,wire.wait_time), tmp_timeslice_num)
         return tmp_timeslice_num
 
     def get_roofline(self):
@@ -311,16 +326,18 @@ class TimeSliceArray(BaseArray):
             self.update_tile()
             # 3, get all transfer data
             transfer_data = dict()
+            tile_state = dict()
             for tile_id, tile in self.tile_dict.items():
                 # transfer_data format: (x, y, end_tile_id, length, layer_out)
                 transfer_data[tile_id] = tile.get_output()
+                tile_state[tile_id] = (tile.input_cache_full(), tile.state)
             # 4, get all wire state
             wire_state = dict()
             for wire_id, wire in self.wire_dict.items():
-                wire_state[wire_id] = wire.state
+                wire_state[wire_id] = (wire.next_data==None,)+wire.get_wait_time()
             # 5, routing
             # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
-            routing_result = self.router.assign(transfer_data, wire_state, self.clock_num)
+            routing_result = self.router.assign(transfer_data, wire_state, tile_state, self.clock_num)
             # 6, set wire task
             self.set_wire_task(routing_result)
         self.get_roofline()
