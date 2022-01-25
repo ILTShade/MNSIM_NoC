@@ -30,7 +30,8 @@ class TimeSliceTile(BaseTile):
         self.data_length = task_cfg['data_length']
         self.input_length = task_cfg['input_length']
         # cache size
-        self.cache_size = task_cfg['cache']
+        self.input_cache_size = task_cfg['input_cache']
+        self.output_cache_size = task_cfg['output_cache']
         # time_slice: span of a time_slice (ns)
         self.time_slice = time_slice
         # Number of outputs for a certain node in input feature map
@@ -43,8 +44,6 @@ class TimeSliceTile(BaseTile):
         self.is_transmitting = False
         # data computed during the simulation
         self.computed_data = 0
-        # backtime for next transition
-        self.backtime = 0
 
     def update_input(self, inputs):
         # Update the input_list with new inputs
@@ -100,7 +99,7 @@ class TimeSliceTile(BaseTile):
     def get_output(self):
         # return the output to be transmitted through wires
         # outputs format: (x, y, end_tile_id, length, layer_out)
-        if self.output_list and self.current_end_tiles and not self.is_transmitting and self.backtime==0:
+        if self.output_list and self.current_end_tiles and not self.is_transmitting:
             output = self.output_list[0]
             return output[0], output[1], self.current_end_tiles[0], self.length, self.layer_out
 
@@ -111,10 +110,6 @@ class TimeSliceTile(BaseTile):
         else: 
             return []
 
-    def set_back_time(self, backtime):
-        # avoid the meaninglessly repeated communication requests
-        self.backtime = backtime
-
     def input_cache_full(self):
         # whether the input cache is full
-        return self.cache_size < self.input_length * (len(self.input_list) + 1)
+        return self.input_cache_size < self.input_length * (len(self.input_list) + 1)

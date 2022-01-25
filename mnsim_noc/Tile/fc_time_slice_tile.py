@@ -59,9 +59,6 @@ class FCTimeSliceTile(TimeSliceTile):
         # compute in the time slice
         if self.state > 0:
             self.state -= n
-        # update the backtime
-        if self.backtime > 0:
-            self.backtime -= n
         # if the tile just finished the computation
         if self.state == 0:
             if self.computing_output:
