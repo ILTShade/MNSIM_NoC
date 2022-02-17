@@ -27,8 +27,8 @@ class TimeSliceTile(BaseTile):
         self.width_output = task_cfg['width_output']
         self.computing_time = task_cfg['computing_time']
         self.end_tiles = task_cfg['end_tiles']
-        self.data_length = task_cfg['data_length']
-        self.input_length = task_cfg['input_length']
+        self.data_length = task_cfg['data_size']
+        self.input_length = task_cfg['input_size']
         # cache size
         self.input_cache_size = task_cfg['input_cache']
         self.output_cache_size = task_cfg['output_cache']
@@ -85,11 +85,14 @@ class TimeSliceTile(BaseTile):
         # Update the output_list with outputs that have been transmitted through wires
         # outputs format: (x, y, end_tile_id)
         for single_output in outputs:
+            if single_output[0:2] != self.output_list[0]:
+                self.logger.warn('Wrong Data: '+str(self.tile_id)+' '+str(self.output_list)+str(outputs)+' '+str(self.current_end_tiles)+' '+str(self.end_tiles))
+                exit()
             if single_output[2] in self.current_end_tiles:
                 self.current_end_tiles.remove(single_output[2])
             else:
-                # TODO:log error
-                pass
+                self.logger.warn('Wrong End Tile Id: '+str(self.tile_id)+' '+str(outputs)+' '+str(self.current_end_tiles)+' '+str(self.end_tiles))
+                exit()
         if not self.current_end_tiles:
             if self.output_list:
                 self.output_list.pop(0)

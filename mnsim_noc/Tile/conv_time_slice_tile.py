@@ -78,7 +78,7 @@ class CONVTimeSliceTile(TimeSliceTile):
                     # update self.computing_output
                     self.computing_output = self.next_output
                     # log the computing time(ns)
-                    self.logger.info('(Compute) layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id))
+                    self.logger.info('(Compute) layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id)+' data:'+str(self.computing_output)+str(self.useless))
                     # update self.next_output
                     x_new = (self.next_output[0] * self.width_output + self.next_output[1]) // self.width_output
                     y_new = (self.next_output[0] * self.width_output + self.next_output[1]) % self.width_output + 1
@@ -91,6 +91,9 @@ class CONVTimeSliceTile(TimeSliceTile):
         # compute in the time slice
         if self.state > 0:
             self.state -= n
+        if self.state < 0:
+            self.logger.warn('tile state < 0')
+            exit()
         # if the tile just finished the computation
         if self.state == 0:
             if self.computing_output:
