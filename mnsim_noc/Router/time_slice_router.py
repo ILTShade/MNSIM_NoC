@@ -53,7 +53,7 @@ class TimeSliceRouter(BaseRouter):
             end_tile_position = list(map(int, re.findall(r"\d+", tile_data[2])))
             step_x = end_tile_position[0]-start_tile_position[0]
             step_y = end_tile_position[1]-start_tile_position[1]
-            length = round(tile_data[3])
+            length = int(tile_data[3])
             data = tile_data[0:3]+(length,tile_data[4])
             # North:0; West:1; South:2; East:3;
             direction_x = 2 if step_x > 0 else 0

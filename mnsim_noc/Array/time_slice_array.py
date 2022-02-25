@@ -54,7 +54,7 @@ class TimeSliceArray(BaseArray):
         self.total_data_size = 0
         self.input_cache_size = input_cache_size
         self.output_cache_size = output_cache_size
-        self.packet_delay = round(float(packet_size) * 8 / self.bandwidth / self.time_slice)
+        self.packet_delay = math.ceil(float(packet_size) * 8 / self.bandwidth / self.time_slice)
 
     def task_assignment(self):
         # save the data length from previous layer
@@ -95,10 +95,10 @@ class TimeSliceArray(BaseArray):
                                                 default_inbuf_size=self.tcg_mapping.max_inbuf_size,
                                                 default_outbuf_size=self.tcg_mapping.max_outbuf_size
                                                 )
-                cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
+                cfg['computing_time'] = math.ceil(temp_tile_latency.tile_latency/self.time_slice)
                 cfg['length'] = int(layer_dict['Outputchannel']) * int(
                     layer_dict['outputbit']) / self.bandwidth / self.time_slice
-                cfg['data_size'] = round(int(layer_dict['Outputchannel']) * int(layer_dict['outputbit'])/cfg['tile_num'])
+                cfg['data_size'] = math.ceil(int(layer_dict['Outputchannel']) * int(layer_dict['outputbit'])/cfg['tile_num'])
                 input_tmp = cfg['height_core']*cfg['width_input']
             elif layer_dict['type'] == 'pooling':
                 cfg['type'] = 'pooling'
@@ -115,10 +115,10 @@ class TimeSliceArray(BaseArray):
                                                         default_inbuf_size = self.tcg_mapping.max_inbuf_size,
                                                         default_outbuf_size = self.tcg_mapping.max_outbuf_size,
                                                         default_inchannel = int(layer_dict['Inputchannel']), default_size = (int(layer_dict['Kernelsize'])**2))
-                cfg['computing_time'] = round(temp_pooling_latency.pooling_latency/self.time_slice)
+                cfg['computing_time'] = math.ceil(temp_pooling_latency.pooling_latency/self.time_slice)
                 cfg['length'] = int(layer_dict['Outputchannel']) * int(
                     layer_dict['outputbit']) / self.bandwidth / self.time_slice
-                cfg['data_size'] = round(int(layer_dict['Outputchannel']) * int(layer_dict['outputbit'])/cfg['tile_num'])
+                cfg['data_size'] = math.ceil(int(layer_dict['Outputchannel']) * int(layer_dict['outputbit'])/cfg['tile_num'])
                 input_tmp = cfg['height_filter']*cfg['width_input']
             elif layer_dict['type'] == 'fc':
                 cfg['type'] = 'fc'
@@ -134,20 +134,20 @@ class TimeSliceArray(BaseArray):
                                 default_inbuf_size=self.tcg_mapping.max_inbuf_size,
                                 default_outbuf_size=self.tcg_mapping.max_outbuf_size
                                 )
-                cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
+                cfg['computing_time'] = math.ceil(temp_tile_latency.tile_latency/self.time_slice)
                 cfg['length'] = int(layer_dict['outputbit']) / self.bandwidth / self.time_slice
-                cfg['data_size'] = round(int(layer_dict['outputbit'])/cfg['tile_num'])
+                cfg['data_size'] = math.ceil(int(layer_dict['outputbit'])/cfg['tile_num'])
                 input_tmp = cfg['height_input']
             else:
                 self.logger.warning('Unsupported layer type, layer_id:' + str(layer_id))
-            cfg['input_cache'] = round(int(self.input_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
-            cfg['output_cache'] = round(int(self.output_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
+            cfg['input_cache'] = math.ceil(int(self.input_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
+            cfg['output_cache'] = math.ceil(int(self.output_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
             # ensure the output cache of the last layer
             if layer_id == self.tcg_mapping.layer_num-1:
                 cfg['output_cache'] = float('inf')
             if layer_id > 0:
                 last_layer_dict = self.tcg_mapping.net[layer_id-1][0][0]
-                cfg['input_size'] = round(int(last_layer_dict['Outputchannel']) * int(
+                cfg['input_size'] = math.ceil(int(last_layer_dict['Outputchannel']) * int(
                     last_layer_dict['outputbit']))
                 # TODO: consider the fc input_length
             else:
@@ -186,7 +186,7 @@ class TimeSliceArray(BaseArray):
                         else:
                             cfg['end_tiles'] = ["{}_{}".format(int(cfg['aggregate_arg'][0]), int(cfg['aggregate_arg'][1]))]
                         cfg['num_out'] = 1
-                        cfg['length'] = round(cfg['length'] / cfg['tile_num'])
+                        cfg['length'] = math.ceil(cfg['length'] / cfg['tile_num'])
                     # different tile types
                     if cfg['type'] == 'conv':
                         tile = CONVTimeSliceTile((i, j), cfg, self.time_slice)
@@ -233,7 +233,7 @@ class TimeSliceArray(BaseArray):
             if tile.input_list or (tile.output_list and tile.end_tiles):
                 return False
         for wire_id, wire in self.wire_dict.items():
-            if wire.state or wire.wait_time:
+            if wire.state > 0 or wire.wait_time > 0:
                 return False
         return True
 
@@ -308,9 +308,9 @@ class TimeSliceArray(BaseArray):
         Y=np.linspace(self.roofline,self.roofline,20*L)
         plt.plot(X,Y,color='g')
         plt.text(L-50,self.roofline,'Total UpperBound')
-        Y=np.linspace(round(self.total_data_size/self.total_computing_power),round(self.total_data_size/self.total_computing_power),20*L)
+        Y=np.linspace(self.total_data_size/self.total_computing_power,self.total_data_size/self.total_computing_power,20*L)
         plt.plot(X,Y,color='g')
-        plt.text(L-50,round(self.total_data_size/self.total_computing_power),'Compute UpperBound')
+        plt.text(L-50,self.total_data_size/self.total_computing_power,'Compute UpperBound')
         for i, item in enumerate(self.roofline_record):
             tmp_X = np.linspace(i,i+0.5,10)
             tmp_Y = np.linspace(item[0],item[0],10)

@@ -109,7 +109,7 @@ class TimeSliceTile(BaseTile):
     def get_roofline(self):
         # return the actual time needed for the computation
         if self.computed_data > 0:
-            return [round(self.computed_data * self.computing_time / self.data_length), self.computed_data, self.data_length, self.computing_time]
+            return [int(self.computed_data * self.computing_time / self.data_length), self.computed_data, self.data_length, self.computing_time]
         else: 
             return []
 

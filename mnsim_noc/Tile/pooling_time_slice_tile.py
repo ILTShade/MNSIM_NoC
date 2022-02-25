@@ -91,9 +91,9 @@ class PoolingTimeSliceTile(TimeSliceTile):
         # compute in the time slice
         if self.state > 0:
             self.state -= n
-        if self.state < 0:
-            self.logger.warn('tile state < 0')
-            exit()
+        # if self.state < 0:
+        #     self.logger.warn('tile state < 0')
+        #     exit()
         # if the tile just finished the computation
         if self.state == 0:
             if self.computing_output:

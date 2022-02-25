@@ -63,7 +63,7 @@ class TimeSliceWire(BaseWire):
         return tmp_data
 
     def get_roofline(self):
-        return round(self.transferred_data)
+        return int(self.transferred_data)
 
     def get_wait_time(self):
         # get the end time of occupation
