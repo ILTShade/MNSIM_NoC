@@ -27,10 +27,11 @@ class TimeSliceTile(BaseTile):
         self.width_output = task_cfg['width_output']
         self.computing_time = task_cfg['computing_time']
         self.end_tiles = task_cfg['end_tiles']
-        self.data_length = task_cfg['data_length']
-        self.input_length = task_cfg['input_length']
+        self.data_length = task_cfg['data_size']
+        self.input_length = task_cfg['input_size']
         # cache size
-        self.cache_size = task_cfg['cache']
+        self.input_cache_size = task_cfg['input_cache']
+        self.output_cache_size = task_cfg['output_cache']
         # time_slice: span of a time_slice (ns)
         self.time_slice = time_slice
         # Number of outputs for a certain node in input feature map
@@ -43,8 +44,6 @@ class TimeSliceTile(BaseTile):
         self.is_transmitting = False
         # data computed during the simulation
         self.computed_data = 0
-        # backtime for next transition
-        self.backtime = 0
 
     def update_input(self, inputs):
         # Update the input_list with new inputs
@@ -86,11 +85,14 @@ class TimeSliceTile(BaseTile):
         # Update the output_list with outputs that have been transmitted through wires
         # outputs format: (x, y, end_tile_id)
         for single_output in outputs:
+            if single_output[0:2] != self.output_list[0]:
+                self.logger.warn('Wrong Data: '+str(self.tile_id)+' '+str(self.output_list)+str(outputs)+' '+str(self.current_end_tiles)+' '+str(self.end_tiles))
+                exit()
             if single_output[2] in self.current_end_tiles:
                 self.current_end_tiles.remove(single_output[2])
             else:
-                # TODO:log error
-                pass
+                self.logger.warn('Wrong End Tile Id: '+str(self.tile_id)+' '+str(outputs)+' '+str(self.current_end_tiles)+' '+str(self.end_tiles))
+                exit()
         if not self.current_end_tiles:
             if self.output_list:
                 self.output_list.pop(0)
@@ -100,21 +102,17 @@ class TimeSliceTile(BaseTile):
     def get_output(self):
         # return the output to be transmitted through wires
         # outputs format: (x, y, end_tile_id, length, layer_out)
-        if self.output_list and self.current_end_tiles and not self.is_transmitting and self.backtime==0:
+        if self.output_list and self.current_end_tiles and not self.is_transmitting:
             output = self.output_list[0]
             return output[0], output[1], self.current_end_tiles[0], self.length, self.layer_out
 
     def get_roofline(self):
         # return the actual time needed for the computation
         if self.computed_data > 0:
-            return [round(self.computed_data * self.computing_time / self.data_length), self.computed_data, self.data_length, self.computing_time]
+            return [int(self.computed_data * self.computing_time / self.data_length), self.computed_data, self.data_length, self.computing_time]
         else: 
             return []
 
-    def set_back_time(self, backtime):
-        # avoid the meaninglessly repeated communication requests
-        self.backtime = backtime
-
     def input_cache_full(self):
         # whether the input cache is full
-        return self.cache_size < self.input_length * (len(self.input_list) + 1)
+        return self.input_cache_size < self.input_length * (len(self.input_list) + 1)

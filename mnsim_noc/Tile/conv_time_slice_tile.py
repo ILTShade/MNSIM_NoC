@@ -62,7 +62,7 @@ class CONVTimeSliceTile(TimeSliceTile):
                             self.width_core + self.stride_core * (self.next_output[1] - 1) - self.padding_core)
                 # if the input_list satisfy the requirement for next output, then allocate the computation task
                 if (self.latest_input[0] * self.width_input + self.latest_input[1]) >= (
-                        x_req * self.width_input + y_req) and self.cache_size >= (len(self.output_list) + 1) * self.data_length:
+                        x_req * self.width_input + y_req) and self.output_cache_size >= (len(self.output_list) + 1) * self.data_length:
                     # update self.useless
                     if self.height_core + self.stride_core * (self.next_output[0] - 1) - self.padding_core == self.height_input + self.padding_core:
                         x_useless = x_req
@@ -78,7 +78,7 @@ class CONVTimeSliceTile(TimeSliceTile):
                     # update self.computing_output
                     self.computing_output = self.next_output
                     # log the computing time(ns)
-                    self.logger.info('(Compute) layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id))
+                    self.logger.info('(Compute) layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id)+' data:'+str(self.computing_output)+str(self.useless))
                     # update self.next_output
                     x_new = (self.next_output[0] * self.width_output + self.next_output[1]) // self.width_output
                     y_new = (self.next_output[0] * self.width_output + self.next_output[1]) % self.width_output + 1
@@ -91,9 +91,9 @@ class CONVTimeSliceTile(TimeSliceTile):
         # compute in the time slice
         if self.state > 0:
             self.state -= n
-        # update the backtime
-        if self.backtime > 0:
-            self.backtime -= n
+        # if self.state < 0:
+        #     self.logger.warn('tile state < 0')
+        #     exit()
         # if the tile just finished the computation
         if self.state == 0:
             if self.computing_output:

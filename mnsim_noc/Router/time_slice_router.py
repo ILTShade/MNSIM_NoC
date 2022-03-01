@@ -8,6 +8,7 @@
     2021/10/22 16:00
 """
 import re
+import copy
 from mnsim_noc.Router import BaseRouter
 
 
@@ -18,7 +19,6 @@ class TimeSliceRouter(BaseRouter):
         super().__init__()
         self.wire_state = None
         self.paths = []
-        self.refused = []
         # time_slice: span of a time_slice (ns)
         self.time_slice = time_slice
         # packet_delay: num of time slice needed for a packet to transfer through a wire
@@ -37,8 +37,6 @@ class TimeSliceRouter(BaseRouter):
         # All paths arranged
         # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
         self.paths = []
-        # refused routing format: (start_tile_id, backtime)
-        self.refused = []
         # mark the occupation during routing
         self.wire_state = wire_state
         for start_tile_id, tile_data in transfer_data.items():
@@ -48,7 +46,6 @@ class TimeSliceRouter(BaseRouter):
             # (x, y, end_tile_id, length, layer_out)
             tile_input_cache_state = tile_state[tile_data[2]]
             if tile_input_cache_state[0]:
-                self.refused.append((start_tile_id, tile_input_cache_state[1]))
                 self.logger.info('(Input Cache Occupied) layer:'+str(tile_data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data[2]))
                 continue
             # extract tile position from id
@@ -56,73 +53,67 @@ class TimeSliceRouter(BaseRouter):
             end_tile_position = list(map(int, re.findall(r"\d+", tile_data[2])))
             step_x = end_tile_position[0]-start_tile_position[0]
             step_y = end_tile_position[1]-start_tile_position[1]
-            length = round(tile_data[3])
+            length = int(tile_data[3])
             data = tile_data[0:3]+(length,tile_data[4])
             # North:0; West:1; South:2; East:3;
             direction_x = 2 if step_x > 0 else 0
+            ceil_x = 1 if step_x > 0 else -1
             direction_y = 3 if step_y > 0 else 1
+            ceil_y = 1 if step_y > 0 else -1
             # Routing algorithm: first in x, then in y, last in x, choose the first possible path
             # Search for possible paths
             current_path = []
-            backtime = float("inf")
             for i in range(0, abs(step_x)+1):
-                current_position = start_tile_position
+                current_position = start_tile_position.copy()
                 path_failed = False
-                backtime_tmp = 0
                 wait_time_tmp = 0
                 # go i steps in x
                 for j in range(1, i+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
-                    backtime_tmp = max(backtime_tmp, self.wire_state[current_wire_id][1], self.wire_state[current_wire_id][2]-wait_time_tmp)
                     if self.wire_state[current_wire_id][2] <= wait_time_tmp and self.wire_state[current_wire_id][0]:
                         current_path.append(current_wire_id)
-                        current_position[0] += 1
+                        current_position[0] += ceil_x
                     else:
                         path_failed = True
                         break
                     wait_time_tmp += self.packet_delay
                 if path_failed:
                     current_path.clear()
-                    backtime = min(backtime, backtime_tmp)
                     continue
                 # go in y
                 for j in range(1, abs(step_y)+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_y)
-                    backtime_tmp = max(backtime_tmp, self.wire_state[current_wire_id][1], self.wire_state[current_wire_id][2]-wait_time_tmp)
                     if self.wire_state[current_wire_id][2] <= wait_time_tmp and self.wire_state[current_wire_id][0]:
                         current_path.append(current_wire_id)
-                        current_position[1] += 1
+                        current_position[1] += ceil_y
                     else:
                         path_failed = True
                         break
                     wait_time_tmp += self.packet_delay
                 if path_failed:
                     current_path.clear()
-                    backtime = min(backtime, backtime_tmp)
                     continue
                 # go abs(step_x)-i steps in x
                 for j in range(1, abs(step_x)-i+1):
                     current_wire_id = "{}_{}_{}".format(current_position[0], current_position[1], direction_x)
-                    backtime_tmp = max(backtime_tmp, self.wire_state[current_wire_id][1], self.wire_state[current_wire_id][2]-wait_time_tmp)
                     if self.wire_state[current_wire_id][2] <= wait_time_tmp and self.wire_state[current_wire_id][0]:
                         current_path.append(current_wire_id)
-                        current_position[0] += 1
+                        current_position[0] += ceil_x
                     else:
                         path_failed = True
                         break
                     wait_time_tmp += self.packet_delay
                 if path_failed:
                     current_path.clear()
-                    backtime = min(backtime, backtime_tmp)
                     continue
                 break
             if current_path:
                 self.paths.append((current_path, data))
                 # log the transfer layer and time(ns)
-                self.logger.info('(Transfer) layer:'+str(data[4])+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+data[3])*self.time_slice))
+                # TODO: 改变传输结束时间估计
+                self.logger.info('(Transfer) layer:'+str(data[4])+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+data[3])*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2])+' data:'+str(data[0:2]))
                 for path_wire_id in current_path:
                     self.wire_state[path_wire_id] = (False, self.wire_state[path_wire_id][1], self.wire_state[path_wire_id][2])
             else:
-                self.refused.append((start_tile_id, round(backtime)))
                 self.logger.info('(Wire Occupied) layer:'+str(data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2]))
-        return self.paths, self.refused
+        return self.paths

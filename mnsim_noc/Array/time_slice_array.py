@@ -11,6 +11,7 @@
 """
 from copy import copy
 import re
+import os
 import copy
 import math
 import configparser as cp
@@ -30,7 +31,7 @@ class TimeSliceArray(BaseArray):
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
-    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, tile_cache_size, packet_size):
+    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size):
         super().__init__(tcg_mapping)
         # span of timeslice: ns
         self.time_slice = time_slice
@@ -51,8 +52,9 @@ class TimeSliceArray(BaseArray):
         self.roofline_record = []
         self.total_computing_power = 0
         self.total_data_size = 0
-        self.tile_cache_size = tile_cache_size
-        self.packet_delay = round(float(packet_size) * 8 / self.bandwidth / self.time_slice)
+        self.input_cache_size = input_cache_size
+        self.output_cache_size = output_cache_size
+        self.packet_delay = math.ceil(float(packet_size) * 8 / self.bandwidth / self.time_slice)
 
     def task_assignment(self):
         # save the data length from previous layer
@@ -93,7 +95,11 @@ class TimeSliceArray(BaseArray):
                                                 default_inbuf_size=self.tcg_mapping.max_inbuf_size,
                                                 default_outbuf_size=self.tcg_mapping.max_outbuf_size
                                                 )
-                cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
+                cfg['computing_time'] = math.ceil(temp_tile_latency.tile_latency/self.time_slice)
+                cfg['length'] = int(layer_dict['Outputchannel']) * int(
+                    layer_dict['outputbit']) / self.bandwidth / self.time_slice
+                cfg['data_size'] = math.ceil(int(layer_dict['Outputchannel']) * int(layer_dict['outputbit'])/cfg['tile_num'])
+                input_tmp = cfg['height_core']*cfg['width_input']
             elif layer_dict['type'] == 'pooling':
                 cfg['type'] = 'pooling'
                 cfg['height_input'] = int(layer_dict['Inputsize'][0])
@@ -109,7 +115,11 @@ class TimeSliceArray(BaseArray):
                                                         default_inbuf_size = self.tcg_mapping.max_inbuf_size,
                                                         default_outbuf_size = self.tcg_mapping.max_outbuf_size,
                                                         default_inchannel = int(layer_dict['Inputchannel']), default_size = (int(layer_dict['Kernelsize'])**2))
-                cfg['computing_time'] = round(temp_pooling_latency.pooling_latency/self.time_slice)
+                cfg['computing_time'] = math.ceil(temp_pooling_latency.pooling_latency/self.time_slice)
+                cfg['length'] = int(layer_dict['Outputchannel']) * int(
+                    layer_dict['outputbit']) / self.bandwidth / self.time_slice
+                cfg['data_size'] = math.ceil(int(layer_dict['Outputchannel']) * int(layer_dict['outputbit'])/cfg['tile_num'])
+                input_tmp = cfg['height_filter']*cfg['width_input']
             elif layer_dict['type'] == 'fc':
                 cfg['type'] = 'fc'
                 cfg['height_input'] = int(layer_dict['Infeature']) / int(self.tcg_mapping.net[layer_id-1][0][0]['Outputchannel'])
@@ -124,22 +134,31 @@ class TimeSliceArray(BaseArray):
                                 default_inbuf_size=self.tcg_mapping.max_inbuf_size,
                                 default_outbuf_size=self.tcg_mapping.max_outbuf_size
                                 )
-                cfg['computing_time'] = round(temp_tile_latency.tile_latency/self.time_slice)
+                cfg['computing_time'] = math.ceil(temp_tile_latency.tile_latency/self.time_slice)
+                cfg['length'] = int(layer_dict['outputbit']) / self.bandwidth / self.time_slice
+                cfg['data_size'] = math.ceil(int(layer_dict['outputbit'])/cfg['tile_num'])
+                input_tmp = cfg['height_input']
             else:
                 self.logger.warning('Unsupported layer type, layer_id:' + str(layer_id))
-            # self.logger.info(cfg['computing_time'])
-            if layer_id < self.tcg_mapping.layer_num-1:
-                cfg['length'] = int(layer_dict['Outputchannel']) * int(
-                    layer_dict['outputbit']) / self.bandwidth / self.time_slice
-            else:
-                cfg['length'] = 1
-            cfg['cache'] = round(int(self.tile_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
+            cfg['input_cache'] = math.ceil(int(self.input_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
+            cfg['output_cache'] = math.ceil(int(self.output_cache_size) * 1024 * 8 / self.bandwidth / self.time_slice)
+            # ensure the output cache of the last layer
+            if layer_id == self.tcg_mapping.layer_num-1:
+                cfg['output_cache'] = float('inf')
             if layer_id > 0:
                 last_layer_dict = self.tcg_mapping.net[layer_id-1][0][0]
-                cfg['input_length'] = round(int(last_layer_dict['Outputchannel']) * int(
-                    last_layer_dict['outputbit']) / self.bandwidth / self.time_slice)
+                cfg['input_size'] = math.ceil(int(last_layer_dict['Outputchannel']) * int(
+                    last_layer_dict['outputbit']))
+                # TODO: consider the fc input_length
             else:
-                cfg['input_length'] = 0
+                cfg['input_size'] = 0
+            # if the cache can take in one output
+            if cfg['data_size'] > cfg['output_cache']:
+                self.logger.warn('output cache size too small, should be more than '+str(math.ceil(cfg['data_size']/8))+'B')
+                exit()
+            if cfg['input_size']*input_tmp > cfg['input_cache']:
+                self.logger.warn('output cache size too small, should be more than '+str(math.ceil(cfg['input_size']*input_tmp/8))+'B')
+                exit()
             self.layer_cfg.append(cfg)
         # generate tile_ids and aggregate_arg for layers
         for i in range(self.tcg_mapping.tile_num[0]):
@@ -161,15 +180,13 @@ class TimeSliceArray(BaseArray):
                         else:
                             cfg['end_tiles'] = self.layer_cfg[cfg['tile_out']]['tile_id']
                         cfg['num_out'] = cfg['tile_num']
-                        cfg['data_length'] = round(cfg['length'] / cfg['tile_num'])
                     else:
                         if layer_id == self.tcg_mapping.layer_num-1:
                             cfg['end_tiles'] = []
                         else:
                             cfg['end_tiles'] = ["{}_{}".format(int(cfg['aggregate_arg'][0]), int(cfg['aggregate_arg'][1]))]
                         cfg['num_out'] = 1
-                        cfg['length'] = round(cfg['length'] / cfg['tile_num'])
-                        cfg['data_length'] = cfg['length']
+                        cfg['length'] = math.ceil(cfg['length'] / cfg['tile_num'])
                     # different tile types
                     if cfg['type'] == 'conv':
                         tile = CONVTimeSliceTile((i, j), cfg, self.time_slice)
@@ -179,6 +196,7 @@ class TimeSliceArray(BaseArray):
                         tile = PoolingTimeSliceTile((i, j), cfg, self.time_slice)
                     # self.logger.info(cfg)
                     self.tile_dict[tile.tile_id] = tile
+                    # self.logger.info('layer_id:'+str(layer_id)+' tile_id:'+str(tile.tile_id)+' tile_type:'+cfg['type']+' computing_time:'+str(cfg['computing_time']))
         # allocate the wires
         for i in range(self.tcg_mapping.tile_num[0]):
             for j in range(self.tcg_mapping.tile_num[1]):
@@ -215,14 +233,14 @@ class TimeSliceArray(BaseArray):
             if tile.input_list or (tile.output_list and tile.end_tiles):
                 return False
         for wire_id, wire in self.wire_dict.items():
-            if wire.state:
+            if wire.state > 0 or wire.wait_time > 0:
                 return False
         return True
 
     def set_wire_task(self, routing_result):
         # task format: (x, y, end_tile_id, length, layer, is_first, is_last)
         # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
-        for path in routing_result[0]:
+        for path in routing_result:
             wire_list = path[0]
             path_data = path[1]
             wire_len = len(wire_list)
@@ -232,8 +250,6 @@ class TimeSliceArray(BaseArray):
                 is_first = (index == 0)
                 is_last = (index == wire_len - 1)
                 self.wire_dict[wire_id].set_wire_task(path_data + (is_first, is_last), index * self.packet_delay)
-        for refused in routing_result[1]:
-            self.tile_dict[refused[0]].set_back_time(refused[1])
 
     def update_tile(self):
         for wire_id, wire_data in self.wire_data_transferred.items():
@@ -252,8 +268,6 @@ class TimeSliceArray(BaseArray):
     def get_timeslice_num(self):
         tmp_timeslice_num = float("inf")
         for tile_id, tile in self.tile_dict.items():
-            if not tile.is_transmitting and tile.output_list and tile.end_tiles:
-                tmp_timeslice_num = min(max(1,tile.backtime), tmp_timeslice_num)
             if tile.computing_output:
                 tmp_timeslice_num = min(max(1,tile.state), tmp_timeslice_num)
         for wire_id, wire in self.wire_dict.items():
@@ -294,9 +308,9 @@ class TimeSliceArray(BaseArray):
         Y=np.linspace(self.roofline,self.roofline,20*L)
         plt.plot(X,Y,color='g')
         plt.text(L-50,self.roofline,'Total UpperBound')
-        Y=np.linspace(round(self.total_data_size/self.total_computing_power),round(self.total_data_size/self.total_computing_power),20*L)
+        Y=np.linspace(self.total_data_size/self.total_computing_power,self.total_data_size/self.total_computing_power,20*L)
         plt.plot(X,Y,color='g')
-        plt.text(L-50,round(self.total_data_size/self.total_computing_power),'Compute UpperBound')
+        plt.text(L-50,self.total_data_size/self.total_computing_power,'Compute UpperBound')
         for i, item in enumerate(self.roofline_record):
             tmp_X = np.linspace(i,i+0.5,10)
             tmp_Y = np.linspace(item[0],item[0],10)
@@ -340,6 +354,7 @@ class TimeSliceArray(BaseArray):
             routing_result = self.router.assign(transfer_data, wire_state, tile_state, self.clock_num)
             # 6, set wire task
             self.set_wire_task(routing_result)
+            # os.system('clear')
         self.get_roofline()
         self.paint_roofline()
         # log the simulation time
