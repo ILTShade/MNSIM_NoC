@@ -37,7 +37,7 @@ def main():
 
 # time slice run
 @main.command(help="Time Slice")
-@click.option("--quiet", "-q", is_flag=True, default=False)
+@click.option("--quiet", "-q", is_flag=True, default=False, help='run without communication conflicts, default: False')
 @click.option("--nn", "-NN", default='vgg8', help="NN model description (name), default: vgg8")
 @click.option("-HWdes", "--hardware_description", default=os.path.join(os.getcwd(), "SimConfig.ini"),
               help="Hardware description file location & name, default:/MNSIM_NoC/SimConfig.ini")
@@ -50,7 +50,8 @@ def main():
 @click.option("--input_cache_size", "-ICS", default=64, help='input_cache_size (KB), default: 64')
 @click.option("--output_cache_size", "-OCS", default=64, help='output_cache_size (KB), default: 64')
 @click.option("--packet_size", "-PKS", default=10, help='packet size(B), default: 10')
-def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size):
+@click.option("--no_communication_conflicts", "-NCC", is_flag=True, default=False)
+def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts):
     # load cfg
     # with open(cfg_file, "r") as f:
     #     cfg = yaml.safe_load(f)
@@ -59,6 +60,6 @@ def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span
     structure_file = __TestInterface.get_structure()
     TCG_mapping = TCG(structure_file, hardware_description, False)
     print('start NoC simulation')
-    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size)
+    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts)
     # run the sim
     array.run()

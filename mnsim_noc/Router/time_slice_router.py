@@ -13,7 +13,7 @@ from mnsim_noc.Router import BaseRouter
 
 
 class TimeSliceRouter(BaseRouter):
-    NAME = "time_slice_tile"
+    NAME = "time_slice_router"
 
     def __init__(self, time_slice, packet_delay):
         super().__init__()

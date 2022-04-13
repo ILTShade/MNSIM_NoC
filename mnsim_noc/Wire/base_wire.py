@@ -31,3 +31,11 @@ class BaseWire(Component):
     @abstractmethod
     def update_time_slice(self, n):
         pass
+
+    @abstractmethod
+    def get_timeslice_num(self):
+        pass
+
+    @abstractmethod
+    def check_finish(self):
+        pass

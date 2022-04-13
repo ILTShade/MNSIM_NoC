@@ -1,7 +1,7 @@
 # -*-coding:utf-8-*-
 """
 @FileName:
-    time_slice_tile.py
+    time_slice_wire.py
 @Description:
     Wire Class for time slice
 @CreateTime:
@@ -11,7 +11,7 @@ from mnsim_noc.Wire import BaseWire
 
 
 class TimeSliceWire(BaseWire):
-    NAME = "time_slice_tile"
+    NAME = "time_slice_wire"
 
     def __init__(self, position):
         super().__init__(position)
@@ -49,10 +49,10 @@ class TimeSliceWire(BaseWire):
             self.state -= n
         if self.state == 0 and self.data:
             # return data to update tile
-            tmp_data = self.data
+            tmp_data = [self.data]
             self.data = None
         else: 
-            tmp_data = None
+            tmp_data = []
         if self.wait_time > 0:
             self.wait_time -= n
         if self.wait_time == 0 and self.next_data and not self.data:
@@ -68,3 +68,18 @@ class TimeSliceWire(BaseWire):
     def get_wait_time(self):
         # get the end time of occupation
         return self.wait_time, self.state
+
+    def get_timeslice_num(self):
+        # get the next timeslice num
+        tmp_timeslice_num = float("inf")
+        if self.data:
+            tmp_timeslice_num =  min(max(1,self.state), tmp_timeslice_num)
+        if self.next_data:
+            tmp_timeslice_num =  min(max(1,self.wait_time), tmp_timeslice_num)
+        return tmp_timeslice_num
+
+    def check_finish(self):
+        if self.state > 0 or self.wait_time > 0:
+            return False
+        else:
+            return True

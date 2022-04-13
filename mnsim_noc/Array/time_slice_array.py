@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mnsim_noc.Array import BaseArray
 from mnsim_noc.Tile import FCTimeSliceTile, CONVTimeSliceTile, PoolingTimeSliceTile
-from mnsim_noc.Wire import TimeSliceWire
-from mnsim_noc.Router import TimeSliceRouter
+from mnsim_noc.Wire import TimeSliceWire, NoConflictsWire
+from mnsim_noc.Router import TimeSliceRouter, NoConflictsRouter
 from MNSIM.Latency_Model.Model_latency import tile_latency_analysis,pooling_latency_analysis
 
 
@@ -31,7 +31,7 @@ class TimeSliceArray(BaseArray):
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
-    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size):
+    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts):
         super().__init__(tcg_mapping)
         # span of timeslice: ns
         self.time_slice = time_slice
@@ -55,6 +55,7 @@ class TimeSliceArray(BaseArray):
         self.input_cache_size = input_cache_size
         self.output_cache_size = output_cache_size
         self.packet_delay = math.ceil(float(packet_size) * 8 / self.bandwidth / self.time_slice)
+        self.no_communication_conflicts = no_communication_conflicts
 
     def task_assignment(self):
         # save the data length from previous layer
@@ -198,23 +199,43 @@ class TimeSliceArray(BaseArray):
                     self.tile_dict[tile.tile_id] = tile
                     # self.logger.info('layer_id:'+str(layer_id)+' tile_id:'+str(tile.tile_id)+' tile_type:'+cfg['type']+' computing_time:'+str(cfg['computing_time']))
         # allocate the wires
-        for i in range(self.tcg_mapping.tile_num[0]):
-            for j in range(self.tcg_mapping.tile_num[1]):
-                # North:0; West:1; South:2; East:3;
-                if i > 0:
-                    wire = TimeSliceWire((i, j, 0))
-                    self.wire_dict[wire.wire_id] = wire
-                if j > 0:
-                    wire = TimeSliceWire((i, j, 1))
-                    self.wire_dict[wire.wire_id] = wire
-                if i < self.tcg_mapping.tile_num[0] - 1:
-                    wire = TimeSliceWire((i, j, 2))
-                    self.wire_dict[wire.wire_id] = wire
-                if j < self.tcg_mapping.tile_num[1] - 1:
-                    wire = TimeSliceWire((i, j, 3))
-                    self.wire_dict[wire.wire_id] = wire
+        if self.no_communication_conflicts:
+            for i in range(self.tcg_mapping.tile_num[0]):
+                for j in range(self.tcg_mapping.tile_num[1]):
+                    # North:0; West:1; South:2; East:3;
+                    if i > 0:
+                        wire = NoConflictsWire((i, j, 0))
+                        self.wire_dict[wire.wire_id] = wire
+                    if j > 0:
+                        wire = NoConflictsWire((i, j, 1))
+                        self.wire_dict[wire.wire_id] = wire
+                    if i < self.tcg_mapping.tile_num[0] - 1:
+                        wire = NoConflictsWire((i, j, 2))
+                        self.wire_dict[wire.wire_id] = wire
+                    if j < self.tcg_mapping.tile_num[1] - 1:
+                        wire = NoConflictsWire((i, j, 3))
+                        self.wire_dict[wire.wire_id] = wire      
+        else:
+            for i in range(self.tcg_mapping.tile_num[0]):
+                for j in range(self.tcg_mapping.tile_num[1]):
+                    # North:0; West:1; South:2; East:3;
+                    if i > 0:
+                        wire = TimeSliceWire((i, j, 0))
+                        self.wire_dict[wire.wire_id] = wire
+                    if j > 0:
+                        wire = TimeSliceWire((i, j, 1))
+                        self.wire_dict[wire.wire_id] = wire
+                    if i < self.tcg_mapping.tile_num[0] - 1:
+                        wire = TimeSliceWire((i, j, 2))
+                        self.wire_dict[wire.wire_id] = wire
+                    if j < self.tcg_mapping.tile_num[1] - 1:
+                        wire = TimeSliceWire((i, j, 3))
+                        self.wire_dict[wire.wire_id] = wire
         # allocate the router
-        self.router = TimeSliceRouter(self.time_slice, self.packet_delay)
+        if self.no_communication_conflicts:
+            self.router = NoConflictsRouter(self.time_slice, self.packet_delay)
+        else:
+            self.router = TimeSliceRouter(self.time_slice, self.packet_delay)
         # distribute inputs for tiles in layer_0
         inputs_inits = []
         if self.layer_cfg[0]['type'] == 'conv' or self.layer_cfg[0]['type'] == 'pooling':
@@ -233,7 +254,7 @@ class TimeSliceArray(BaseArray):
             if tile.input_list or (tile.output_list and tile.end_tiles):
                 return False
         for wire_id, wire in self.wire_dict.items():
-            if wire.state > 0 or wire.wait_time > 0:
+            if not wire.check_finish():
                 return False
         return True
 
@@ -252,9 +273,9 @@ class TimeSliceArray(BaseArray):
                 self.wire_dict[wire_id].set_wire_task(path_data + (is_first, is_last), index * self.packet_delay)
 
     def update_tile(self):
-        for wire_id, wire_data in self.wire_data_transferred.items():
-            if wire_data:
-                # wire_data format: (x, y, end_tile_id, layer, is_first, is_last)
+        for wire_id, wire_datas in self.wire_data_transferred.items():
+            for wire_data in wire_datas:
+                # wire_data format: list[(x, y, end_tile_id, layer, is_first, is_last)]
                 if wire_data[4]:
                     wire_position = tuple(map(int, re.findall(r"\d+", wire_id)))
                     tile_id = "{}_{}".format(wire_position[0], wire_position[1])
@@ -271,10 +292,7 @@ class TimeSliceArray(BaseArray):
             if tile.computing_output:
                 tmp_timeslice_num = min(max(1,tile.state), tmp_timeslice_num)
         for wire_id, wire in self.wire_dict.items():
-            if wire.data:
-                tmp_timeslice_num = min(max(1,wire.state), tmp_timeslice_num)
-            if wire.next_data:
-                tmp_timeslice_num = min(max(1,wire.wait_time), tmp_timeslice_num)
+            tmp_timeslice_num = min(wire.get_timeslice_num(), tmp_timeslice_num)
         return tmp_timeslice_num
 
     def get_roofline(self):
@@ -327,6 +345,7 @@ class TimeSliceArray(BaseArray):
             if self.check_finish():
                 break
             self.next_slice_num = self.get_timeslice_num()
+            # self.logger.info('timeslice:'+str(self.next_slice_num))
             # 0, all tile and wire update for one slice
             for tile_id, tile in self.tile_dict.items():
                 tile.update_time_slice(self.next_slice_num)
@@ -347,19 +366,21 @@ class TimeSliceArray(BaseArray):
                 tile_state[tile_id] = (tile.input_cache_full(), tile.state)
             # 4, get all wire state
             wire_state = dict()
-            for wire_id, wire in self.wire_dict.items():
-                wire_state[wire_id] = (wire.next_data==None,)+wire.get_wait_time()
+            if not self.no_communication_conflicts:
+                for wire_id, wire in self.wire_dict.items():
+                    wire_state[wire_id] = (wire.next_data==None,)+wire.get_wait_time()
             # 5, routing
             # path format: (list[occupied_wire_id], (x, y, end_tile_id, length, layer_out))
             routing_result = self.router.assign(transfer_data, wire_state, tile_state, self.clock_num)
             # 6, set wire task
             self.set_wire_task(routing_result)
             # os.system('clear')
-        self.get_roofline()
-        self.paint_roofline()
         # log the simulation time
         self.logger.info('(Finish) Total Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
         # log the roofline
-        self.logger.info('(Upper Bound) Theoretically Shortest Compute Time: ' + str(self.roofline * self.time_slice) + 'ns')
-        self.logger.info('(Upper Bound) Theoretically Critical Constrains: ' + str(self.roofline_constrain))
-        self.logger.info('(Upper Bound) Actual Utilization Ratio: ' + str(self.roofline / self.clock_num * 100) + '%')
+        if not self.no_communication_conflicts:
+            self.get_roofline()
+            self.paint_roofline()
+            self.logger.info('(Upper Bound) Theoretically Shortest Compute Time: ' + str(self.roofline * self.time_slice) + 'ns')
+            self.logger.info('(Upper Bound) Theoretically Critical Constrains: ' + str(self.roofline_constrain))
+            self.logger.info('(Upper Bound) Actual Utilization Ratio: ' + str(self.roofline / self.clock_num * 100) + '%')
