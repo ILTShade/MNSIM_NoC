@@ -10,6 +10,7 @@
 import re
 import copy
 from mnsim_noc.Router import BaseRouter
+from mnsim_noc.Data.data import Data
 
 
 class TimeSliceRouter(BaseRouter):
@@ -44,17 +45,17 @@ class TimeSliceRouter(BaseRouter):
                 continue
             # tile_data format:
             # (x, y, end_tile_id, length, layer_out)
-            tile_input_cache_state = tile_state[tile_data[2]]
+            tile_input_cache_state = tile_state[tile_data.end_tile_id]
             if tile_input_cache_state[0]:
-                self.logger.info('(Input Cache Occupied) layer:'+str(tile_data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data[2]))
+                self.logger.info('(Input Cache Occupied) layer:'+str(tile_data.layer_out)+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id))
                 continue
             # extract tile position from id
             start_tile_position = list(map(int, re.findall(r"\d+", start_tile_id)))
-            end_tile_position = list(map(int, re.findall(r"\d+", tile_data[2])))
+            end_tile_position = list(map(int, re.findall(r"\d+", tile_data.end_tile_id)))
             step_x = end_tile_position[0]-start_tile_position[0]
             step_y = end_tile_position[1]-start_tile_position[1]
-            length = int(tile_data[3])
-            data = tile_data[0:3]+(length,tile_data[4])
+            length = int(tile_data.length)
+            tile_data.length = length
             # North:0; West:1; South:2; East:3;
             direction_x = 2 if step_x > 0 else 0
             ceil_x = 1 if step_x > 0 else -1
@@ -108,12 +109,12 @@ class TimeSliceRouter(BaseRouter):
                     continue
                 break
             if current_path:
-                self.paths.append((current_path, data))
+                self.paths.append((current_path, tile_data))
                 # log the transfer layer and time(ns)
                 # TODO: 改变传输结束时间估计
-                self.logger.info('(Transfer) layer:'+str(data[4])+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+data[3])*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2])+' data:'+str(data[0:2]))
+                self.logger.info('(Transfer) layer:'+str(tile_data.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+tile_data.length)*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id)+' data:'+str((tile_data.x,tile_data.y)))
                 for path_wire_id in current_path:
                     self.wire_state[path_wire_id] = (False, self.wire_state[path_wire_id][1], self.wire_state[path_wire_id][2])
             else:
-                self.logger.info('(Wire Occupied) layer:'+str(data[4])+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(data[2]))
+                self.logger.info('(Wire Occupied) layer:'+str(tile_data.layer_out)+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id))
         return self.paths

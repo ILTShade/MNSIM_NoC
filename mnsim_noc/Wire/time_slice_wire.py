@@ -32,15 +32,15 @@ class TimeSliceWire(BaseWire):
         self.wait_time = wait_time
         # data Format:(x, y, end_tile_id, layer, is_first, is_last)
         self.next_data = wire_tasks
-        self.transferred_data += wire_tasks[3]
+        self.transferred_data += wire_tasks.length
         # if self.data and self.next_data and self.state > self.wait_time:
         #     self.logger.warn("(Wrong wire behaviour) state:"+str(self.state)+' wait_time:'+str(self.wait_time))
         #     exit()
         # else:
         #     self.logger.info("(Wire task set) state:"+str(self.state)+' wait_time:'+str(self.wait_time))
         if self.wait_time == 0 and self.next_data and not self.data:
-            self.state = self.next_data[3]
-            self.data = self.next_data[0:3] + self.next_data[4:7]
+            self.state = self.next_data.length
+            self.data = self.next_data
             self.next_data = None
             self.wait_time = 0
 
@@ -56,8 +56,8 @@ class TimeSliceWire(BaseWire):
         if self.wait_time > 0:
             self.wait_time -= n
         if self.wait_time == 0 and self.next_data and not self.data:
-            self.state = self.next_data[3]
-            self.data = self.next_data[0:3] + self.next_data[4:7]
+            self.state = self.next_data.length
+            self.data = self.next_data
             self.next_data = None
             self.wait_time = 0
         return tmp_data

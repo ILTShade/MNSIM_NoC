@@ -9,6 +9,7 @@
 """
 from abc import abstractmethod
 from mnsim_noc.Tile import BaseTile
+from mnsim_noc.Data.data import Data
 
 
 class TimeSliceTile(BaseTile):
@@ -44,6 +45,8 @@ class TimeSliceTile(BaseTile):
         self.is_transmitting = False
         # data computed during the simulation
         self.computed_data = 0
+        # the current computing image id
+        self.image_id = 0
 
     def update_input(self, inputs):
         # Update the input_list with new inputs
@@ -51,25 +54,27 @@ class TimeSliceTile(BaseTile):
         # Merge new inputs into nodes on input feature map, and then add to input_list
         for single_input in inputs:
             # modify the inputs from fc layer
-            if single_input[1] == -1:
+            if single_input.y == -1:
                 if self.width_input > 0:
-                    single_input = ((single_input[0]-1)//self.width_input+1, (single_input[0]-1) % self.width_input + 1, single_input[2])
-            if single_input[2] == self.layer_in:
-                self.input_list.append(single_input[0:2])
-                self.latest_input = single_input[0:2]
-            elif single_input[2] == self.layer_out:
+                    single_input.x = (single_input.x-1)//self.width_input+1
+                    single_input.y = (single_input.x-1) % self.width_input + 1
+            tmp_input = (single_input.x,single_input.y)
+            if single_input.layer_out == self.layer_in:
+                self.input_list.append(tmp_input)
+                self.latest_input = tmp_input
+            elif single_input.layer_out == self.layer_out:
                 if self.num_out == 1:
                     self.logger.warning("Error: wrong input layer")
-                elif single_input[0:2] in self.output_to_be_merged:
-                    current_num = self.output_to_be_merged[single_input[0:2]]
+                elif tmp_input in self.output_to_be_merged:
+                    current_num = self.output_to_be_merged[tmp_input]
                     if current_num == self.num_out - 1:
-                        self.output_list.append(single_input[0:2])
-                        del self.output_to_be_merged[single_input[0:2]]
+                        self.output_list.append(tmp_input)
+                        del self.output_to_be_merged[tmp_input]
                     else:
-                        self.output_to_be_merged[single_input[0:2]] = current_num + 1
+                        self.output_to_be_merged[tmp_input] = current_num + 1
                 # if not
                 else:
-                    self.output_to_be_merged[single_input[0:2]] = 1
+                    self.output_to_be_merged[tmp_input] = 1
             else:
                 self.logger.warning("Error: wrong input layer")
 
@@ -85,11 +90,12 @@ class TimeSliceTile(BaseTile):
         # Update the output_list with outputs that have been transmitted through wires
         # outputs format: (x, y, end_tile_id)
         for single_output in outputs:
-            if single_output[0:2] != self.output_list[0]:
+            tmp_output = (single_output.x,single_output.y)
+            if tmp_output != self.output_list[0]:
                 self.logger.warn('Wrong Data: '+str(self.tile_id)+' '+str(self.output_list)+str(outputs)+' '+str(self.current_end_tiles)+' '+str(self.end_tiles))
                 exit()
-            if single_output[2] in self.current_end_tiles:
-                self.current_end_tiles.remove(single_output[2])
+            if single_output.end_tile_id in self.current_end_tiles:
+                self.current_end_tiles.remove(single_output.end_tile_id)
             else:
                 self.logger.warn('Wrong End Tile Id: '+str(self.tile_id)+' '+str(outputs)+' '+str(self.current_end_tiles)+' '+str(self.end_tiles))
                 exit()
@@ -104,7 +110,8 @@ class TimeSliceTile(BaseTile):
         # outputs format: (x, y, end_tile_id, length, layer_out)
         if self.output_list and self.current_end_tiles and not self.is_transmitting:
             output = self.output_list[0]
-            return output[0], output[1], self.current_end_tiles[0], self.length, self.layer_out
+            data = Data(x=output[0],y=output[1],end_tile_id=self.current_end_tiles[0],length=self.length,layer_out=self.layer_out,image_id=self.image_id)
+            return data
 
     def get_roofline(self):
         # return the actual time needed for the computation

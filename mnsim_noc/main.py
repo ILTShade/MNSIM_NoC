@@ -51,15 +51,13 @@ def main():
 @click.option("--output_cache_size", "-OCS", default=64, help='output_cache_size (KB), default: 64')
 @click.option("--packet_size", "-PKS", default=10, help='packet size(B), default: 10')
 @click.option("--no_communication_conflicts", "-NCC", is_flag=True, default=False)
-def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts):
-    # load cfg
-    # with open(cfg_file, "r") as f:
-    #     cfg = yaml.safe_load(f)
+@click.option("--allow_pipeline", "-AP", is_flag=True, default=False)
+def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline):
     # init array
     __TestInterface = TrainTestInterface(network_module=nn, dataset_module='MNSIM.Interface.cifar10', SimConfig_path=hardware_description, weights_file=weights, device=device)
     structure_file = __TestInterface.get_structure()
     TCG_mapping = TCG(structure_file, hardware_description, False)
-    print('start NoC simulation')
-    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts)
+    # print('start NoC simulation')
+    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline)
     # run the sim
     array.run()

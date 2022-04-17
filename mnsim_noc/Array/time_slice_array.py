@@ -21,6 +21,7 @@ from mnsim_noc.Array import BaseArray
 from mnsim_noc.Tile import FCTimeSliceTile, CONVTimeSliceTile, PoolingTimeSliceTile
 from mnsim_noc.Wire import TimeSliceWire, NoConflictsWire
 from mnsim_noc.Router import TimeSliceRouter, NoConflictsRouter
+from mnsim_noc.Data.data import Data
 from MNSIM.Latency_Model.Model_latency import tile_latency_analysis,pooling_latency_analysis
 
 
@@ -31,7 +32,7 @@ class TimeSliceArray(BaseArray):
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
-    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts):
+    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline):
         super().__init__(tcg_mapping)
         # span of timeslice: ns
         self.time_slice = time_slice
@@ -45,6 +46,11 @@ class TimeSliceArray(BaseArray):
         self.tile_dict = dict()
         self.wire_dict = dict()
         self.wire_data_transferred = dict()
+        # tile_id/wire_id -> block_num
+        self.block_dict = dict()
+        # detailed location of each block
+        # e.g. [block 0: (0,0,7,7), block 1: (8,0,15,7)]
+        self.block_allocate = []
         self.layer_cfg = []
         self.next_slice_num = 1
         self.roofline = 0
@@ -56,6 +62,7 @@ class TimeSliceArray(BaseArray):
         self.output_cache_size = output_cache_size
         self.packet_delay = math.ceil(float(packet_size) * 8 / self.bandwidth / self.time_slice)
         self.no_communication_conflicts = no_communication_conflicts
+        self.allow_pipeline = allow_pipeline
 
     def task_assignment(self):
         # save the data length from previous layer
@@ -64,7 +71,6 @@ class TimeSliceArray(BaseArray):
             layer_dict = self.tcg_mapping.net[layer_id][0][0]
             cfg = dict()
             # TODO: extended to support branch
-            # can be extended to support branch
             if len(self.tcg_mapping.layer_tileinfo[layer_id]['Inputindex']) > 1:
                 self.logger.warning('Do not support branch')
             cfg['layer_in'] = self.tcg_mapping.layer_tileinfo[layer_id]['Inputindex'][0] + layer_id
@@ -236,15 +242,19 @@ class TimeSliceArray(BaseArray):
             self.router = NoConflictsRouter(self.time_slice, self.packet_delay)
         else:
             self.router = TimeSliceRouter(self.time_slice, self.packet_delay)
+        # allocate the block
+        # TODO: allocate tiles and wires to block using block_allocate
         # distribute inputs for tiles in layer_0
         inputs_inits = []
         if self.layer_cfg[0]['type'] == 'conv' or self.layer_cfg[0]['type'] == 'pooling':
             for x in range(self.layer_cfg[0]['height_input']):
                 for y in range(self.layer_cfg[0]['width_input']):
-                    inputs_inits.append((x + 1, y + 1, -1))
+                    data = Data(x = x + 1,y = y + 1,layer_out=-1)
+                    inputs_inits.append(data)
         elif self.layer_cfg[0]['type'] == 'fc':
             for x in range(self.layer_cfg[0]['height_input']):
-                inputs_inits.append((x + 1, -1, -1))
+                data = Data(x = x + 1,y = -1,layer_out=-1)
+                inputs_inits.append(data)
         for tile_id in self.layer_cfg[0]['tile_id']:
             self.tile_dict[tile_id].update_input(inputs_inits)
             self.tile_dict[tile_id].set_tile_task(self.clock_num)
@@ -268,21 +278,22 @@ class TimeSliceArray(BaseArray):
             start_tile_id = "{}_{}".format(tuple(map(int, re.findall(r"\d+", wire_list[0])))[0],tuple(map(int, re.findall(r"\d+", wire_list[0])))[1])
             self.tile_dict[start_tile_id].is_transmitting = True
             for index, wire_id in enumerate(wire_list):
-                is_first = (index == 0)
-                is_last = (index == wire_len - 1)
-                self.wire_dict[wire_id].set_wire_task(path_data + (is_first, is_last), index * self.packet_delay)
+                tmp_data = copy.copy(path_data)
+                tmp_data.is_first = (index == 0)
+                tmp_data.is_last = (index == wire_len - 1)
+                self.wire_dict[wire_id].set_wire_task(tmp_data, index * self.packet_delay)
 
     def update_tile(self):
         for wire_id, wire_datas in self.wire_data_transferred.items():
             for wire_data in wire_datas:
                 # wire_data format: list[(x, y, end_tile_id, layer, is_first, is_last)]
-                if wire_data[4]:
+                if wire_data.is_first:
                     wire_position = tuple(map(int, re.findall(r"\d+", wire_id)))
                     tile_id = "{}_{}".format(wire_position[0], wire_position[1])
-                    self.tile_dict[tile_id].update_output([wire_data[0:3]])
-                if wire_data[5]:
-                    tile_id = wire_data[2]
-                    self.tile_dict[tile_id].update_input([wire_data[0:2] + (wire_data[3],)])
+                    self.tile_dict[tile_id].update_output([wire_data])
+                if wire_data.is_last:
+                    tile_id = wire_data.end_tile_id
+                    self.tile_dict[tile_id].update_input([wire_data])
         for tile_id, tile in self.tile_dict.items():
             tile.set_tile_task(self.clock_num)
 

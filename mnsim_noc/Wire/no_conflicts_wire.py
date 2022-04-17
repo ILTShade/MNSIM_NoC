@@ -24,7 +24,7 @@ class NoConflictsWire(BaseWire):
 
     def set_wire_task(self, wire_tasks, wait_time):
         # Format:(x, y, end_tile_id, length, layer, is_first, is_last)
-        self.data.append([int(wire_tasks[3])+int(wait_time),wire_tasks[0:3]+wire_tasks[4:7]])
+        self.data.append([int(wire_tasks.length)+int(wait_time),wire_tasks])
 
     def update_time_slice(self, n):
         # Format: list[(x, y, end_tile_id, layer, is_first, is_last)]
@@ -36,7 +36,7 @@ class NoConflictsWire(BaseWire):
             if single_data[0] == 0:
                 tmp_data.append(single_data[1])
                 self.data.remove(single_data)
-        return tmp_data       
+        return tmp_data
 
     def get_roofline(self):
         # no need for roofline
