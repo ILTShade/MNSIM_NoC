@@ -61,8 +61,15 @@ class CONVTimeSliceTile(TimeSliceTile):
                 y_req = min(self.width_input,
                             self.width_core + self.stride_core * (self.next_output[1] - 1) - self.padding_core)
                 # if the input_list satisfy the requirement for next output, then allocate the computation task
-                if (self.latest_input[0] * self.width_input + self.latest_input[1]) >= (
-                        x_req * self.width_input + y_req) and self.output_cache_size >= (len(self.output_list) + 1) * self.data_length:
+                satisfy = True
+                for x in range(0,self.height_core):
+                    for y in range(0,self.width_core):
+                        if (x_req-x,y_req-y) not in self.input_list:
+                            satisfy = False
+                            break
+                    if not satisfy:
+                        break
+                if satisfy and self.output_cache_size >= (len(self.output_list) + 1) * self.data_length:
                     # update self.useless
                     if self.height_core + self.stride_core * (self.next_output[0] - 1) - self.padding_core == self.height_input + self.padding_core:
                         x_useless = x_req

@@ -37,8 +37,6 @@ class TimeSliceTile(BaseTile):
         self.time_slice = time_slice
         # Number of outputs for a certain node in input feature map
         self.output_to_be_merged = dict()
-        # Coordinate of the latest input on the input feature map
-        self.latest_input = (0, 0)
         # List of id of tiles where the current output still needs to be sent to
         self.current_end_tiles = self.end_tiles[:]
         # whether the tile is transmitting data or not
@@ -61,7 +59,6 @@ class TimeSliceTile(BaseTile):
             tmp_input = (single_input.x,single_input.y)
             if single_input.layer_out == self.layer_in:
                 self.input_list.append(tmp_input)
-                self.latest_input = tmp_input
             elif single_input.layer_out == self.layer_out:
                 if self.num_out == 1:
                     self.logger.warning("Error: wrong input layer")
