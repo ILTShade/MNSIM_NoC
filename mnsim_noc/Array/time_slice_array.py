@@ -32,7 +32,7 @@ class TimeSliceArray(BaseArray):
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
-    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline):
+    def __init__(self, tcg_mapping, time_slice, sim_config_path, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline, quiet):
         super().__init__(tcg_mapping)
         # span of timeslice: ns
         self.time_slice = time_slice
@@ -62,7 +62,10 @@ class TimeSliceArray(BaseArray):
         self.output_cache_size = output_cache_size
         self.packet_delay = math.ceil(float(packet_size) * 8 / self.bandwidth / self.time_slice)
         self.no_communication_conflicts = no_communication_conflicts
+        # pipeline
         self.allow_pipeline = allow_pipeline
+        self.pipeline_num = 50 if(allow_pipeline) else 1
+        self.quiet = quiet
 
     def task_assignment(self):
         # save the data length from previous layer
@@ -196,11 +199,11 @@ class TimeSliceArray(BaseArray):
                         cfg['length'] = math.ceil(cfg['length'] / cfg['tile_num'])
                     # different tile types
                     if cfg['type'] == 'conv':
-                        tile = CONVTimeSliceTile((i, j), cfg, self.time_slice)
+                        tile = CONVTimeSliceTile((i, j), cfg, self.time_slice, self.quiet)
                     elif cfg['type'] == 'fc':
-                        tile = FCTimeSliceTile((i, j), cfg, self.time_slice)
+                        tile = FCTimeSliceTile((i, j), cfg, self.time_slice, self.quiet)
                     elif cfg['type'] == 'pooling':
-                        tile = PoolingTimeSliceTile((i, j), cfg, self.time_slice)
+                        tile = PoolingTimeSliceTile((i, j), cfg, self.time_slice, self.quiet)
                     # self.logger.info(cfg)
                     self.tile_dict[tile.tile_id] = tile
                     # self.logger.info('layer_id:'+str(layer_id)+' tile_id:'+str(tile.tile_id)+' tile_type:'+cfg['type']+' computing_time:'+str(cfg['computing_time']))
@@ -239,34 +242,49 @@ class TimeSliceArray(BaseArray):
                         self.wire_dict[wire.wire_id] = wire
         # allocate the router
         if self.no_communication_conflicts:
-            self.router = NoConflictsRouter(self.time_slice, self.packet_delay)
+            self.router = NoConflictsRouter(self.time_slice, self.packet_delay, self.quiet)
         else:
-            self.router = TimeSliceRouter(self.time_slice, self.packet_delay)
+            self.router = TimeSliceRouter(self.time_slice, self.packet_delay, self.quiet)
         # allocate the block
         # TODO: allocate tiles and wires to block using block_allocate
+    
+    def check_inputs(self, input_image_id):
+        for tile_id in self.layer_cfg[0]['tile_id']:
+            if not self.tile_dict[tile_id].finish_pipeline(input_image_id-1):
+                return False
+        return True
+    
+    def setup_inputs(self, input_image_id):
         # distribute inputs for tiles in layer_0
         inputs_inits = []
         if self.layer_cfg[0]['type'] == 'conv' or self.layer_cfg[0]['type'] == 'pooling':
             for x in range(self.layer_cfg[0]['height_input']):
                 for y in range(self.layer_cfg[0]['width_input']):
-                    data = Data(x = x + 1,y = y + 1,layer_out=-1)
+                    data = Data(x = x + 1,y = y + 1,layer_out=-1, image_id=input_image_id)
                     inputs_inits.append(data)
         elif self.layer_cfg[0]['type'] == 'fc':
             for x in range(self.layer_cfg[0]['height_input']):
-                data = Data(x = x + 1,y = -1,layer_out=-1)
+                data = Data(x = x + 1,y = -1,layer_out=-1, image_id=input_image_id)
                 inputs_inits.append(data)
         for tile_id in self.layer_cfg[0]['tile_id']:
             self.tile_dict[tile_id].update_input(inputs_inits)
             self.tile_dict[tile_id].set_tile_task(self.clock_num)
 
-    def check_finish(self):
-        for tile_id, tile in self.tile_dict.items():
-            if tile.input_list or (tile.output_list and tile.end_tiles):
-                return False
-        for wire_id, wire in self.wire_dict.items():
-            if not wire.check_finish():
-                return False
-        return True
+    def check_finish(self, image_id = 0):
+        if self.allow_pipeline:
+            # check the output of the last layer
+            for tile_id in self.layer_cfg[self.tcg_mapping.layer_num-1]['tile_id']:
+                if not self.tile_dict[tile_id].finish_pipeline(image_id):
+                    return False
+            return True
+        else:
+            for tile_id, tile in self.tile_dict.items():
+                if tile.input_list or (tile.output_list and tile.end_tiles):
+                    return False
+            for wire_id, wire in self.wire_dict.items():
+                if not wire.check_finish():
+                    return False
+            return True
 
     def set_wire_task(self, routing_result):
         # task format: (x, y, end_tile_id, length, layer, is_first, is_last)
@@ -351,10 +369,33 @@ class TimeSliceArray(BaseArray):
     def run(self):
         # task assignment
         self.task_assignment()
+        # pipeline
+        input_image_id = 0
+        computing_image_id = 0
+        # start time of each image
+        start_time = []
+        # compute time of each image
+        compute_time = []
         # run for every slice
         while True:
-            if self.check_finish():
-                break
+            # check pipeline inputs
+            if input_image_id < self.pipeline_num:
+                if self.check_inputs(input_image_id):
+                    start_time.append(self.clock_num)
+                    self.setup_inputs(input_image_id)
+                    self.logger.info('(Add input) image '+str(input_image_id)+' Clock num: '+str(self.clock_num))
+                    input_image_id += 1
+            # check the finish condition
+            if self.check_finish(computing_image_id):
+                if not self.allow_pipeline:
+                    break
+                else:
+                    compute_time.append(self.clock_num-start_time[computing_image_id])
+                    self.logger.info('(Get output) image '+str(computing_image_id)+' Clock num: '+str(self.clock_num))
+                    computing_image_id += 1
+                    if computing_image_id == self.pipeline_num:
+                        break
+            # get next_slice_num
             self.next_slice_num = self.get_timeslice_num()
             # self.logger.info('timeslice:'+str(self.next_slice_num))
             # 0, all tile and wire update for one slice
@@ -374,7 +415,7 @@ class TimeSliceArray(BaseArray):
             for tile_id, tile in self.tile_dict.items():
                 # transfer_data format: (x, y, end_tile_id, length, layer_out)
                 transfer_data[tile_id] = tile.get_output()
-                tile_state[tile_id] = (tile.input_cache_full(), tile.state)
+                tile_state[tile_id] = (tile.input_cache_full(), tile.state, tile.input_image_id, tile.output_image_id, tile.layer_in, tile.layer_out)
             # 4, get all wire state
             wire_state = dict()
             if not self.no_communication_conflicts:
@@ -387,7 +428,14 @@ class TimeSliceArray(BaseArray):
             self.set_wire_task(routing_result)
             # os.system('clear')
         # log the simulation time
-        self.logger.info('(Finish) Total Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
+        if self.allow_pipeline:
+            for i in range(0,self.pipeline_num):
+                if i > 0:
+                    self.logger.info('(Finish) Image '+str(i)+' Pipeline Span: ' + str((start_time[i]-start_time[i-1]) * self.time_slice) + 'ns')
+                self.logger.info('(Finish) Image '+str(i)+' Compute Time: ' + str(compute_time[i] * self.time_slice) + 'ns')
+            self.logger.info('(Finish) Total Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
+        else:
+            self.logger.info('(Finish) Total Compute Time: ' + str(self.clock_num * self.time_slice) + 'ns')
         # log the roofline
         if not self.no_communication_conflicts:
             self.get_roofline()

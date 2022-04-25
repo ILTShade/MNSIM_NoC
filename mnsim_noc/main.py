@@ -58,6 +58,6 @@ def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span
     structure_file = __TestInterface.get_structure()
     TCG_mapping = TCG(structure_file, hardware_description, False)
     # print('start NoC simulation')
-    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline)
+    array = TimeSliceArray(TCG_mapping, time_slice_span, hardware_description, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline, quiet)
     # run the sim
     array.run()

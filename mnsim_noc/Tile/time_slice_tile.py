@@ -15,7 +15,7 @@ from mnsim_noc.Data.data import Data
 class TimeSliceTile(BaseTile):
     REGISTRY = "time_slice_tile"
 
-    def __init__(self, position, task_cfg, time_slice):
+    def __init__(self, position, task_cfg, time_slice, quiet):
         super().__init__(position, task_cfg)
         # Extract parameters from task_cfg
         self.length = task_cfg['length']
@@ -43,8 +43,13 @@ class TimeSliceTile(BaseTile):
         self.is_transmitting = False
         # data computed during the simulation
         self.computed_data = 0
-        # the current computing image id
-        self.image_id = 0
+        # the current receive image id
+        self.input_image_id = 0
+        # count the input to find if all the data of an image is received
+        self.input_count = 0
+        # the current compute iamge id
+        self.output_image_id = 0
+        self.quiet = quiet
 
     def update_input(self, inputs):
         # Update the input_list with new inputs
@@ -56,10 +61,19 @@ class TimeSliceTile(BaseTile):
                 if self.width_input > 0:
                     single_input.x = (single_input.x-1)//self.width_input+1
                     single_input.y = (single_input.x-1) % self.width_input + 1
-            tmp_input = (single_input.x,single_input.y)
+            tmp_input = (single_input.x,single_input.y,single_input.image_id)
             if single_input.layer_out == self.layer_in:
+                # DEBUG: Not allowed input
+                if single_input.image_id != self.input_image_id:
+                    self.logger.warn('wrong image_id')
+                    exit()
                 self.input_list.append(tmp_input)
+                self.input_count += 1
             elif single_input.layer_out == self.layer_out:
+                # DEBUG: Not allowed input
+                if single_input.image_id > self.output_image_id:
+                    self.logger.warn('wrong image_id')
+                    exit()
                 if self.num_out == 1:
                     self.logger.warning("Error: wrong input layer")
                 elif tmp_input in self.output_to_be_merged:
@@ -87,7 +101,7 @@ class TimeSliceTile(BaseTile):
         # Update the output_list with outputs that have been transmitted through wires
         # outputs format: (x, y, end_tile_id)
         for single_output in outputs:
-            tmp_output = (single_output.x,single_output.y)
+            tmp_output = (single_output.x,single_output.y,single_output.image_id)
             if tmp_output != self.output_list[0]:
                 self.logger.warn('Wrong Data: '+str(self.tile_id)+' '+str(self.output_list)+str(outputs)+' '+str(self.current_end_tiles)+' '+str(self.end_tiles))
                 exit()
@@ -107,7 +121,7 @@ class TimeSliceTile(BaseTile):
         # outputs format: (x, y, end_tile_id, length, layer_out)
         if self.output_list and self.current_end_tiles and not self.is_transmitting:
             output = self.output_list[0]
-            data = Data(x=output[0],y=output[1],end_tile_id=self.current_end_tiles[0],length=self.length,layer_out=self.layer_out,image_id=self.image_id)
+            data = Data(x=output[0],y=output[1],end_tile_id=self.current_end_tiles[0],length=self.length,layer_out=self.layer_out,image_id=output[2])
             return data
 
     def get_roofline(self):
@@ -120,3 +134,10 @@ class TimeSliceTile(BaseTile):
     def input_cache_full(self):
         # whether the input cache is full
         return self.input_cache_size < self.input_length * (len(self.input_list) + 1)
+
+    def finish_pipeline(self, image_id):
+        # whether the tile finish the computing of certain image
+        if self.output_image_id > image_id:
+            return True
+        else:
+            return False

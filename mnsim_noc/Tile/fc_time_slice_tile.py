@@ -13,7 +13,7 @@ from mnsim_noc.Tile import TimeSliceTile
 class FCTimeSliceTile(TimeSliceTile):
     NAME = "fc_time_slice_tile"
 
-    def __init__(self, position, task_cfg, time_slice):
+    def __init__(self, position, task_cfg, time_slice, quiet):
         # input and output data
         # format: (start_tile_id, end_tile_id, layer, x, y, length)
         """
@@ -35,26 +35,27 @@ class FCTimeSliceTile(TimeSliceTile):
             end_tiles:
                 List of id of tiles where the outputs should be sent to
         """
-        super().__init__(position, task_cfg, time_slice)
+        super().__init__(position, task_cfg, time_slice, quiet)
         # Coordinate of the output under computation on the output feature map
         self.computing_output = False
         self.output_complete = False
 
     def set_tile_task(self, clock_num):
-        if self.output_complete:
-            return
         # if the tile is not computing
         if self.state == 0:
-            # if the input satisfy the requirement
-            if len(self.input_list) == self.height_input:
+            # if the input_list satisfy the requirement for next output, then allocate the computation task
+            if self.input_count == self.height_input:
                 self.state = self.computing_time
                 self.computing_output = True
+                # update the received image id
+                # TODO: 考虑流水线输入的总图片数量
+                self.input_image_id += 1
+                self.input_count = 0
                 # log the computing time(ns)
-                self.logger.info('(Compute) layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id))
+                if not self.quiet:
+                    self.logger.info('(Compute) image_id:'+str(self.output_image_id)+' layer:'+str(self.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+self.computing_time)*self.time_slice)+' tile_id:'+str(self.tile_id))
 
     def update_time_slice(self, n):
-        if self.output_complete:
-            return
         # Computing process in fc tile
         # compute in the time slice
         if self.state > 0:
@@ -76,7 +77,10 @@ class FCTimeSliceTile(TimeSliceTile):
                     # if not
                     else:
                         self.output_to_be_merged[(i, -1)] = 1
-                # delete all inputs
-                self.input_list = []
-                self.output_complete = True
+                # delete all inputs from the current image id
+                for input in self.input_list[:]:
+                    if input[2] == self.output_image_id:
+                        self.input_list.remove(input)
+                # update the computing image_id
+                self.output_image_id += 1
                 self.computing_output = False

@@ -14,8 +14,9 @@ from mnsim_noc.base import Component
 class BaseRouter(Component):
     REGISTRY = "router"
 
-    def __init__(self):
+    def __init__(self, quiet):
         super().__init__()
+        self.quiet = quiet
 
     @abstractmethod
     def assign(self, transfer_data, wire_state):

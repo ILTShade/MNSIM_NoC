@@ -119,3 +119,7 @@ results/
 
 # pyc
 *.pyc
+
+# log
+*.out
+*.png

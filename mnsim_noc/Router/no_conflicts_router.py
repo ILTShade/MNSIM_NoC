@@ -16,8 +16,8 @@ from mnsim_noc.Data.data import Data
 class NoConflictsRouter(BaseRouter):
     NAME = "no_conflicts_router"
 
-    def __init__(self, time_slice, packet_delay):
-        super().__init__()
+    def __init__(self, time_slice, packet_delay, quiet):
+        super().__init__(quiet)
         self.wire_state = None
         self.paths = []
         # time_slice: span of a time_slice (ns)
@@ -44,10 +44,24 @@ class NoConflictsRouter(BaseRouter):
                 continue
             # tile_data format:
             # (x, y, end_tile_id, length, layer_out)
-            tile_input_cache_state = tile_state[tile_data.end_tile]
+            tile_input_cache_state = tile_state[tile_data.end_tile_id]
             if tile_input_cache_state[0]:
-                self.logger.info('(Input Cache Occupied) layer:'+str(tile_data.layer_out)+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id))
+                if not self.quiet:
+                    self.logger.info('(Input Cache Occupied) image_id:'+str(tile_data.image_id)+'layer:'+str(tile_data.layer_out)+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id))
                 continue
+            if tile_input_cache_state[4] == tile_data.layer_out:
+                if tile_data.image_id != tile_input_cache_state[2]:
+                    if not self.quiet:
+                        self.logger.warn('(wrong image_id) image_id:'+str(tile_data.image_id)+' layer:'+str(tile_data.layer_out)+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id))
+                    continue
+            elif tile_input_cache_state[5] == tile_data.layer_out:
+                if tile_data.image_id > tile_input_cache_state[3]:
+                    if not self.quiet:
+                        self.logger.warn('(wrong image_id) image_id:'+str(tile_data.image_id)+' layer:'+str(tile_data.layer_out)+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id))
+                    continue
+            else:
+                self.logger.warn('(wrong layer) image_id:'+str(tile_data.image_id)+' layer:'+str(tile_data.layer_out)+' time:'+str(clock_num*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id))
+                exit()
             # extract tile position from id
             start_tile_position = list(map(int, re.findall(r"\d+", start_tile_id)))
             end_tile_position = list(map(int, re.findall(r"\d+", tile_data.end_tile_id)))
@@ -79,5 +93,6 @@ class NoConflictsRouter(BaseRouter):
                 wait_time_tmp += self.packet_delay
             self.paths.append((current_path, tile_data))
             # log the transfer layer and time(ns)
-            self.logger.info('(Transfer) layer:'+str(tile_data.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+tile_data.length)*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id)+' data:'+str((tile_data.x,tile_data.y)))
+            if not self.quiet:
+                self.logger.info('(Transfer) image_id:'+str(tile_data.image_id)+'layer:'+str(tile_data.layer_out)+' start:'+str(clock_num*self.time_slice)+' finish:'+str((clock_num+tile_data.length)*self.time_slice)+' start_tile:'+str(start_tile_id)+' end_tile:'+str(tile_data.end_tile_id)+' data:'+str((tile_data.x,tile_data.y)))
         return self.paths
