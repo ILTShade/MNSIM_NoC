@@ -29,6 +29,8 @@ class MultiOutputBuffer(Component):
                 OutputBuffer(buffer_size)
         # assert output target id
         assert len(output_target_id) > 0, "output target id is empty"
+        if len(output_target_id) == 1 and output_target_id[0] == -1:
+            self.set_end()
 
     def check_enough_space(self, data_list):
         """
