@@ -48,3 +48,30 @@ class WireNet(Component):
         """
         for wire in self.wires:
             wire.set_transparent_flag(transparent_flag)
+
+    def get_data_path_state(self, transfer_path):
+        """
+        get data path state
+        return True only when all wires are idle
+        """
+        all_state = [self.wires_map[str(path)].get_wire_state()
+            for path in transfer_path for wire in path
+        ]
+        return all(all_state)
+
+    def set_data_path_state(self, transfer_path, state):
+        """
+        set data path state
+        """
+        for path in transfer_path:
+            self.wires_map[str(path)].set_wire_state(state)
+
+    def get_wire_transfer_time(self, transfer_path, data_list):
+        """
+        get wire transfer time
+        """
+        transfer_time = 0.
+        for path in transfer_path:
+            wire = self.wires_map[str(path)]
+            transfer_time += wire.get_transfer_time(data_list)
+        return transfer_time

@@ -44,8 +44,8 @@ def test_buffer():
     # for computation example on the tile output buffer
     # judge part
     assert(output_buffer.check_remain_size() == 256)
-    # communication start, nothing
-    # communication end
+    # computation start, nothing
+    # computation end
     output_buffer.add_data_list(data_list[0:1])
     # for communication example on the tile output buffer
     # judge part

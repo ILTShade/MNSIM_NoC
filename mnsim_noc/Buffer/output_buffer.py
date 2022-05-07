@@ -44,7 +44,7 @@ class OutputBuffer(BaseBuffer):
         if len(self.buffer_data) == 0:
             return None
         else:
-            return self.buffer_data[0]
+            return [self.buffer_data[0]]
 
     def set_end(self):
         """

@@ -58,7 +58,11 @@ def test_tile():
     tile = BaseTile((0, 0), 2, (4096, 4096), tile_behavior_cfg)
     tile.input_buffer.set_start()
     # check for update
-    for i in range(100):
-        tile.update(i*2)
+    current_time = 0
+    while True:
+        tile.update(current_time)
+        current_time = tile.get_computation_end_time()
         # print(tile.get_computation_end_time())
+        if current_time == float("inf"):
+            break
     print(tile.get_computation_range())

@@ -100,6 +100,8 @@ class BaseTile(Component):
             self.computation_end_time = current_time + computation["latency"]
             self.computation_range_time.append((current_time, self.computation_end_time))
             return None
+        else:
+            self.computation_end_time = float("inf")
 
     def get_computation_end_time(self):
         """
