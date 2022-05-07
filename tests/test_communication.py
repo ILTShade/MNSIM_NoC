@@ -44,7 +44,7 @@ def test_communication():
         "task_id": 0,
         "layer_id": 1,
         "tile_id": 1,
-        "target_tile_id": None,
+        "target_tile_id": [-1],
         "dependence": [
             {
                 "wait": [[0, 0, 0, 3, 9, 3, None, 0, -1]],

@@ -21,7 +21,7 @@ def test_tile():
         "task_id": 0,
         "layer_id": 0,
         "tile_id": 0,
-        "target_tile_id": 1,
+        "target_tile_id": [1],
         "dependence": [
             {
                 "wait": [[1, 1, 0, 3, 9, 3, None, -1, -1]],

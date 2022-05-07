@@ -32,6 +32,7 @@ class BaseCommunication(Component):
         # input buffer and output buffer, for tile
         self.output_buffer = self.input_tile.output_buffer
         self.input_buffer = self.output_tile.input_buffer
+        self.target_tile_id = self.output_tile.tile_id
         # state
         self.running_state = False
         self.communication_end_time = float("inf")
@@ -60,7 +61,7 @@ class BaseCommunication(Component):
         # TODO: there may be larger for the tile input buffer
         if self.running_state:
             return False
-        self.transfer_data = self.output_buffer.next_transfer_data()
+        self.transfer_data = self.output_buffer.next_transfer_data(self.target_tile_id)
         if self.transfer_data is not None \
             and self.input_buffer.check_enough_space(self.transfer_data):
             return True
@@ -79,7 +80,7 @@ class BaseCommunication(Component):
         self.transfer_path = trasnfer_path
         # set buffer
         self.input_buffer.add_transfer_data_list(self.transfer_data)
-        self.output_buffer.delete_data_list(self.transfer_data)
+        self.output_buffer.delete_data_list(self.transfer_data, self.target_tile_id)
         # get transfet time
         transfer_time = self.wire_net.get_wire_transfer_time(trasnfer_path, self.transfer_data)
         assert transfer_time > 0, "transfer time should be positive"
