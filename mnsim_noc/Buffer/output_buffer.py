@@ -28,6 +28,13 @@ class OutputBuffer(BaseBuffer):
             return float("inf")
         return self.buffer_size - self.used_space
 
+    def check_enough_space(self, data_list):
+        """
+        check if the buffer has enough space to add the data
+        """
+        data_size = sum([get_data_size(data) for data in data_list])
+        return self.check_remain_size() >= data_size
+
     def next_transfer_data(self):
         """
         get the next transfer data

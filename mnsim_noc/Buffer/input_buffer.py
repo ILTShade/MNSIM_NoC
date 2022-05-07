@@ -32,6 +32,13 @@ class InputBuffer(BaseBuffer):
         """
         return self.buffer_size - self.used_space - self.transfer_data_size
 
+    def check_enough_space(self, data_list):
+        """
+        check if the buffer has enough space to add the data
+        """
+        data_size = sum([get_data_size(data) for data in data_list])
+        return self.check_remain_size() >= data_size
+
     def _add_transfer_one(self, data):
         """
         add one data to the transfer data
