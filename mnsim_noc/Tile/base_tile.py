@@ -35,7 +35,9 @@ class BaseTile(Component):
         # other parameters
         self.task_id = tile_behavior_cfg["task_id"] # value
         self.tile_id = tile_behavior_cfg["tile_id"] # value
+        self.layer_id = tile_behavior_cfg["layer_id"] # value
         self.target_tile_id = tile_behavior_cfg["target_tile_id"] # this is a list
+        self.merge_flag = tile_behavior_cfg.get("merge_flag", False)
         # input buffer and output buffer
         self.input_buffer = InputBuffer(buffer_size[0])
         self.output_buffer = MultiOutputBuffer(buffer_size[1], self.target_tile_id)

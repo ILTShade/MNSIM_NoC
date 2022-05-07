@@ -54,7 +54,7 @@ class Schedule(Component):
         for i, ready_flag in enumerate(communication_ready_flag):
             if ready_flag:
                 transfer_path = self.get_naive_path(self.communication_list[i])
-                if self.wire_net.get_data_path_state(transfer_path):
+                if not self.wire_net.get_data_path_state(transfer_path):
                     transfer_path_list.append(transfer_path)
                     self.wire_net.set_data_path_state(transfer_path, True)
                     continue

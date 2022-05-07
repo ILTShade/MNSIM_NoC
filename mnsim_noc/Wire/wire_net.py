@@ -30,17 +30,27 @@ class WireNet(Component):
         # horizontally wire
         for i in range(tile_net_shape[0]):
             for j in range(tile_net_shape[1] - 1):
-                wire_postion = ((i, j), (i, j + 1))
-                wire = BaseWire(wire_postion, band_width)
+                wire_position = ((i, j), (i, j + 1))
+                wire = BaseWire(wire_position, band_width)
                 self.wires.append(wire)
-                self.wires_map[str(wire_postion)] = wire
+                self.wires_map[self._get_map_key(wire_position)] = wire
         # vertically wire
         for j in range(tile_net_shape[1]):
             for i in range(tile_net_shape[0] - 1):
-                wire_postion = ((i, j), (i + 1, j))
-                wire = BaseWire(wire_postion, band_width)
+                wire_position = ((i, j), (i + 1, j))
+                wire = BaseWire(wire_position, band_width)
                 self.wires.append(wire)
-                self.wires_map[str(wire_postion)] = wire
+                self.wires_map[self._get_map_key(wire_position)] = wire
+
+    def _get_map_key(self, wire_position):
+        """
+        wire position, tuple of tuple
+        like: ((0, 0), (0, 1))
+        """
+        if wire_position[0][0] + wire_position[0][1] > \
+            wire_position[1][0] + wire_position[1][1]:
+            return str((wire_position[1], wire_position[0]))
+        return str(wire_position)
 
     def set_transparent_flag(self, transparent_flag):
         """
@@ -52,19 +62,19 @@ class WireNet(Component):
     def get_data_path_state(self, transfer_path):
         """
         get data path state
-        return True only when all wires are idle
+        return False only when all wires are idle
         """
-        all_state = [self.wires_map[str(path)].get_wire_state()
-            for path in transfer_path for wire in path
+        all_state = [self.wires_map[self._get_map_key(path)].get_wire_state()
+            for path in transfer_path
         ]
-        return all(all_state)
+        return any(all_state)
 
     def set_data_path_state(self, transfer_path, state):
         """
         set data path state
         """
         for path in transfer_path:
-            self.wires_map[str(path)].set_wire_state(state)
+            self.wires_map[self._get_map_key(path)].set_wire_state(state)
 
     def get_wire_transfer_time(self, transfer_path, data_list):
         """
@@ -72,6 +82,6 @@ class WireNet(Component):
         """
         transfer_time = 0.
         for path in transfer_path:
-            wire = self.wires_map[str(path)]
+            wire = self.wires_map[self._get_map_key(path)]
             transfer_time += wire.get_transfer_time(data_list)
         return transfer_time

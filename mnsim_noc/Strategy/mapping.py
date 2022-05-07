@@ -51,6 +51,10 @@ class Mapping(Component):
                     tile_behavior
                 )
                 tile_list.append(tile)
+        # set buffer as start
+        for tile in tile_list:
+            if tile.layer_id == 0 and not tile.merge_flag:
+                tile.input_buffer.set_start()
         # get wire net
         wire_net = WireNet((self.tile_row, self.tile_column), self.band_width)
         # communication list
@@ -82,6 +86,6 @@ class Mapping(Component):
             # last for the communication input tile is this tile
             for communication in communication_list:
                 if communication.input_tile == tile and id(communication) not in communication_in_ids:
-                    communication_list.append(id(communication))
+                    communication_in_ids.append(id(communication))
                     update_module.append(communication)
         return update_module

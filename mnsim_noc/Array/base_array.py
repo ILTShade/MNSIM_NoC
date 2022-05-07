@@ -23,10 +23,10 @@ class BaseArray(Component):
     ):
         super(BaseArray, self).__init__()
         self.mapping_strategy = Mapping(
-            task_behavior_list, image_num,  tile_net_shape, buffer_size, band_width
+            task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
         )
         self.tile_list, self.communication_list = self.mapping_strategy.mapping_net()
-        self.schedule_strategy = Schedule(self.tile_list, self.communication_list)
+        self.schedule_strategy = Schedule(self.communication_list)
 
     def run(self):
         """
@@ -36,6 +36,7 @@ class BaseArray(Component):
         update_module = self.mapping_strategy.get_update_order(
             self.tile_list, self.communication_list
         )
+        time_point_list = []
         while True:
             # running the data
             for module in update_module:
@@ -52,3 +53,6 @@ class BaseArray(Component):
             current_time = next_time
             if current_time == float("inf"):
                 break
+            else:
+                time_point_list.append(current_time)
+        return time_point_list
