@@ -10,7 +10,6 @@
 from abc import abstractmethod
 from mnsim_noc import Component
 
-
 class BaseTile(Component):
     REGISTRY = "tile"
 

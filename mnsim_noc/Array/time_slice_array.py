@@ -28,7 +28,7 @@ from MNSIM.Latency_Model.Model_latency import tile_latency_analysis,pooling_late
 class TimeSliceArray(BaseArray):
     NAME = "time_slice_array"
     '''
-    array_cfg: 
+    array_cfg:
     time_slice: span of a time_slice (ns)
     sim_config_path: hardware description
     '''
@@ -64,7 +64,7 @@ class TimeSliceArray(BaseArray):
         self.no_communication_conflicts = no_communication_conflicts
         # pipeline
         self.allow_pipeline = allow_pipeline
-        self.pipeline_num = 50 if(allow_pipeline) else 1
+        self.pipeline_num = 10 if(allow_pipeline) else 1
         self.quiet = quiet
 
     def task_assignment(self):
@@ -223,7 +223,7 @@ class TimeSliceArray(BaseArray):
                         self.wire_dict[wire.wire_id] = wire
                     if j < self.tcg_mapping.tile_num[1] - 1:
                         wire = NoConflictsWire((i, j, 3))
-                        self.wire_dict[wire.wire_id] = wire      
+                        self.wire_dict[wire.wire_id] = wire
         else:
             for i in range(self.tcg_mapping.tile_num[0]):
                 for j in range(self.tcg_mapping.tile_num[1]):
@@ -247,13 +247,13 @@ class TimeSliceArray(BaseArray):
             self.router = TimeSliceRouter(self.time_slice, self.packet_delay, self.quiet)
         # allocate the block
         # TODO: allocate tiles and wires to block using block_allocate
-    
+
     def check_inputs(self, input_image_id):
         for tile_id in self.layer_cfg[0]['tile_id']:
             if not self.tile_dict[tile_id].finish_pipeline(input_image_id-1):
                 return False
         return True
-    
+
     def setup_inputs(self, input_image_id):
         # distribute inputs for tiles in layer_0
         inputs_inits = []

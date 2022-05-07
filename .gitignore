@@ -123,3 +123,6 @@ results/
 # log
 *.out
 *.png
+
+# data and example
+datas/

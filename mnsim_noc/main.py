@@ -13,8 +13,7 @@ import yaml
 from mnsim_noc.utils.registry import RegistryMeta
 from mnsim_noc.Array import TimeSliceArray
 from importlib import import_module
-from MNSIM.Interface.interface import *
-from MNSIM.Accuracy_Model.Weight_update import weight_update
+from MNSIM.Interface.utils.init_interface import _init_evaluation_interface
 from MNSIM.Mapping_Model.Behavior_mapping import behavior_mapping
 from MNSIM.Mapping_Model.Tile_connection_graph import TCG
 
@@ -54,7 +53,8 @@ def main():
 @click.option("--allow_pipeline", "-AP", is_flag=True, default=False)
 def time_slice(quiet, nn, hardware_description, weights, device, time_slice_span, inter_tile_bandwidth, input_cache_size, output_cache_size, packet_size, no_communication_conflicts, allow_pipeline):
     # init array
-    __TestInterface = TrainTestInterface(network_module=nn, dataset_module='MNSIM.Interface.cifar10', SimConfig_path=hardware_description, weights_file=weights, device=device)
+    # __TestInterface = TrainTestInterface(network_module=nn, dataset_module='MNSIM.Interface.cifar10', SimConfig_path=hardware_description, weights_file=weights, device=device)
+    __TestInterface = _init_evaluation_interface(nn, "cifar10", hardware_description, None, device)
     structure_file = __TestInterface.get_structure()
     TCG_mapping = TCG(structure_file, hardware_description, False)
     # print('start NoC simulation')
