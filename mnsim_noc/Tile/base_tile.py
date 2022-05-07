@@ -44,6 +44,7 @@ class BaseTile(Component):
         self.computation_list = self._get_computation_list()
         self.computation_id = 0
         self.computation_end_time = float("inf")
+        self.computation_range_time = []
 
     def _get_computation_list(self):
         """
@@ -97,6 +98,7 @@ class BaseTile(Component):
             self.computation_list[self.computation_id][1] = "running"
             assert computation["latency"] > 0, "latency should be positive"
             self.computation_end_time = current_time + computation["latency"]
+            self.computation_range_time.append((current_time, self.computation_end_time))
             return None
 
     def get_computation_end_time(self):
@@ -107,3 +109,15 @@ class BaseTile(Component):
             return self.computation_end_time
         else:
             return float("inf")
+
+    def get_computation_range(self):
+        """
+        get the range of the computation
+        """
+        computation_range = []
+        dependence_length = len(self.tile_behavior_cfg["dependence"])
+        for i in range(self.image_num):
+            computation_range.append([])
+            for j in range(dependence_length):
+                computation_range[-1].append(self.computation_range_time[i*dependence_length+j])
+        return computation_range

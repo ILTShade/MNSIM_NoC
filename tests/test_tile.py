@@ -60,4 +60,5 @@ def test_tile():
     # check for update
     for i in range(100):
         tile.update(i*2)
-        print(tile.get_computation_end_time())
+        # print(tile.get_computation_end_time())
+    print(tile.get_computation_range())
