@@ -84,7 +84,12 @@ class BaseArray(Component):
         communication_load_rate = [
             communication.get_simulation_result(end_time) for communication in self.communication_list
         ]
+        def _get_str(load_rate):
+            return " ".join([f"{x:.3f}" for x in load_rate]) + \
+                f", max is {max(load_rate):.4f}"
+
+        print("Total time: {} ns".format(end_time))
         print("For the tile")
-        print(f"{tile_load_rate}, max is {max(tile_load_rate)}")
+        print(_get_str(tile_load_rate))
         print("For the communication")
-        print(f"{communication_load_rate}, max is {max(communication_load_rate)}")
+        print(_get_str(communication_load_rate))

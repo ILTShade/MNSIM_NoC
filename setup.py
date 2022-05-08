@@ -80,7 +80,4 @@ setup(
     cmdclass={"test": PyTest},
 
     zip_safe=True,
-    package_data={
-        "aw_nas": ["VERSION"]
-    }
 )
