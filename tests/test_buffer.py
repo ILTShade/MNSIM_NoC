@@ -9,7 +9,8 @@
 @CreateTime:
     2022/05/07 11:09
 """
-from mnsim_noc.Buffer import InputBuffer, OutputBuffer
+from mnsim_noc.Buffer import InputBuffer
+from mnsim_noc.Buffer.output_buffer import OutputBuffer
 
 def test_buffer():
     """

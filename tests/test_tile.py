@@ -15,7 +15,6 @@ def test_tile():
     """
     test tile
     """
-    from mnsim_noc.Tile import BaseTile
     # tile_behavior_cfg example
     tile_behavior_cfg = {
         "task_id": 0,

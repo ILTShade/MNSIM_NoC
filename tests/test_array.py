@@ -9,7 +9,7 @@
 @CreateTime:
     2022/05/07 21:48
 """
-from mnsim_noc.Array.base_array import BaseArray
+from mnsim_noc.Array import BaseArray
 
 def get_test_config():
     """

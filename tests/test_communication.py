@@ -76,7 +76,6 @@ def test_communication():
         # map communication schedule
         if communication_1.check_communication_ready():
             transfer_path = [((0, 0), (0, 1))]
-            wire_net.set_data_path_state(transfer_path, True)
         else:
             transfer_path = None
         communication_1.set_communication_task(current_time, transfer_path)
