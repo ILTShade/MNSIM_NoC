@@ -36,6 +36,8 @@ class BaseWire(Component):
         """
         set the wire state
         """
+        if self.transparent_flag:
+            return None
         assert wire_state != self.running_state
         self.running_state = wire_state
 

@@ -85,3 +85,10 @@ class WireNet(Component):
             wire = self.wires_map[self._get_map_key(path)]
             transfer_end_time += wire.get_transfer_time(data_list)
         return transfer_end_time
+
+    def check_finish(self):
+        """
+        check if all wires are idle
+        """
+        for wire in self.wires:
+            assert wire.get_wire_state() == False

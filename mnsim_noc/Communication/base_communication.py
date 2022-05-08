@@ -105,3 +105,21 @@ class BaseCommunication(Component):
         get the range of the communication
         """
         return self.communication_range_time
+
+    def check_finish(self):
+        """
+        check if the communication is finish
+        """
+        assert self.running_state == False, "communication should be idle"
+        assert self.communication_end_time == float("inf"), \
+            "communication end time should be inf"
+
+    def get_simulation_result(self, end_time):
+        """
+        get the simulation result
+        """
+        self.check_finish()
+        communication_time = sum([
+            end - start for start, end in self.communication_range_time
+        ])
+        return communication_time * 1. / end_time

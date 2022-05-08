@@ -65,3 +65,10 @@ class MultiOutputBuffer(Component):
         """
         for output_buffer in self.output_buffer_list.values():
             output_buffer.set_end()
+
+    def check_finish(self):
+        """
+        check if the buffer is finished
+        """
+        for output_buffer in self.output_buffer_list.values():
+            output_buffer.check_finish()

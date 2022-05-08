@@ -91,6 +91,7 @@ class BaseTile(Component):
         assert self.running_state == False, "running_state should be idle"
         if self.computation_id >= len(self.computation_list):
             # if all computation are done, return None
+            self.computation_end_time = float("inf")
             return None
         computation = self.computation_list[self.computation_id][0]
         # for idle state, running state is False
@@ -129,3 +130,26 @@ class BaseTile(Component):
             for j in range(dependence_length):
                 computation_range[-1].append(self.computation_range_time[i*dependence_length+j])
         return computation_range
+
+    def check_finish(self):
+        """
+        check if the tile is finished
+        """
+        assert self.running_state == False, "running_state should be idle"
+        assert self.computation_id == len(self.computation_list), \
+            "computation_id should to the end of the list"
+        assert self.computation_end_time == float("inf"), \
+            "computation_end_time should be inf"
+        self.input_buffer.check_finish()
+        self.output_buffer.check_finish()
+
+    def get_simulation_result(self, end_time):
+        """
+        get the simulation result
+        """
+        self.check_finish()
+        # get the range of the computation
+        computation_time = sum([
+            end - start for start, end in self.computation_range_time
+        ])
+        return computation_time * 1. / end_time

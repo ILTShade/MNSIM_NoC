@@ -106,3 +106,10 @@ class InputBuffer(BaseBuffer):
         set this input buffer to the start
         """
         self.start_flag = True
+
+    def check_finish(self):
+        """
+        check if the input buffer is finished
+        """
+        if not self.start_flag:
+            assert len(self.buffer_data) == 0, "the input buffer is not empty"

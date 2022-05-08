@@ -102,10 +102,10 @@ def get_test_config():
         "target_tile_id": [4],
         "dependence": [
             {
-                "wait": [[0, 0, 0, 3, 9, 3, None, 2, -1]],
+                "wait": [[0, 0, 0, 3, 9, 3, None, 1, -1], [0, 0, 0, 3, 9, 3, None, 2, -1]],
                 "output": [[0, 0, 0, 3, 9, 3, None, 3, -1]],
                 "latency": 6,
-                "drop": [[0, 0, 0, 3, 9, 3, None, 2, -1]],
+                "drop": [[0, 0, 0, 3, 9, 3, None, 1, -1], [0, 0, 0, 3, 9, 3, None, 2, -1]],
             },
         ]
     }

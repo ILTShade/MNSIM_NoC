@@ -58,9 +58,33 @@ class BaseArray(Component):
                 break
             else:
                 self.time_point_list.append(current_time)
+        # check if the simulation is over
+        self.check_finish()
 
     def check_finish(self):
         """
         check if the simulation is over and right
         """
         # check if the tile is finished
+        for tile in self.tile_list:
+            tile.check_finish()
+        # check if the communication is finished
+        for communication in self.communication_list:
+            communication.check_finish()
+        # check if the wire net is finished
+        self.wire_net.check_finish()
+
+    def show_simulation_result(self):
+        """
+        show the simulation result
+        """
+        # show the tile result
+        end_time = self.time_point_list[-1]
+        tile_load_rate = [tile.get_simulation_result(end_time) for tile in self.tile_list]
+        communication_load_rate = [
+            communication.get_simulation_result(end_time) for communication in self.communication_list
+        ]
+        print("For the tile")
+        print(f"{tile_load_rate}, max is {max(tile_load_rate)}")
+        print("For the communication")
+        print(f"{communication_load_rate}, max is {max(communication_load_rate)}")

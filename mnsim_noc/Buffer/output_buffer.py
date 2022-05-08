@@ -51,3 +51,10 @@ class OutputBuffer(BaseBuffer):
         set this buffer ad the end buffer
         """
         self.end_flag = True
+
+    def check_finish(self):
+        """
+        check if the buffer is finished
+        """
+        if not self.end_flag:
+            assert len(self.buffer_data) == 0, "the buffer is not empty"
