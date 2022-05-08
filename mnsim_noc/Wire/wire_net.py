@@ -76,12 +76,12 @@ class WireNet(Component):
         for path in transfer_path:
             self.wires_map[self._get_map_key(path)].set_wire_state(state)
 
-    def get_wire_transfer_time(self, transfer_path, data_list):
+    def get_wire_transfer_time(self, transfer_path, data_list, current_time):
         """
         get wire transfer time
         """
-        transfer_time = 0.
+        transfer_end_time = current_time
         for path in transfer_path:
             wire = self.wires_map[self._get_map_key(path)]
-            transfer_time += wire.get_transfer_time(data_list)
-        return transfer_time
+            transfer_end_time += wire.get_transfer_time(data_list)
+        return transfer_end_time

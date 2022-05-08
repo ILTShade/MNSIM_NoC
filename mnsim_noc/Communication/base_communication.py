@@ -48,6 +48,7 @@ class BaseCommunication(Component):
         """
         if self.running_state:
             if current_time >= self.communication_end_time:
+                # PHASE COMMUNICATION END
                 # NO next communication
                 self.running_state = False
                 self.input_buffer.add_data_list(self.transfer_data)
@@ -61,6 +62,7 @@ class BaseCommunication(Component):
         # TODO: there may be larger for the tile input buffer
         if self.running_state:
             return False
+        # PHASE COMMUNICATION JUDGE
         self.transfer_data = self.output_buffer.next_transfer_data(self.target_tile_id)
         if self.transfer_data is not None \
             and self.input_buffer.check_enough_space(self.transfer_data):
@@ -76,18 +78,18 @@ class BaseCommunication(Component):
                 self.communication_end_time = float("inf")
             return None
         assert not self.running_state, f"communication should be idle"
+        # PHASE COMMUNICATION START
         self.running_state = True
         self.transfer_path = trasnfer_path
         # set buffer
         self.input_buffer.add_transfer_data_list(self.transfer_data)
         self.output_buffer.delete_data_list(self.transfer_data, self.target_tile_id)
         # get transfet time
-        transfer_time = self.wire_net.get_wire_transfer_time(trasnfer_path, self.transfer_data)
-        assert transfer_time > 0, "transfer time should be positive"
-        self.communication_end_time = current_time + transfer_time
+        transfer_end_time = self.wire_net.get_wire_transfer_time(trasnfer_path, self.transfer_data, current_time)
+        self.communication_end_time = transfer_end_time
         self.communication_range_time.append((current_time, self.communication_end_time))
         # set wire state, in schedule
-        # self.wire_net.set_data_path_state(self.transfer_path, True)
+        self.wire_net.set_data_path_state(self.transfer_path, True)
 
     def get_communication_end_time(self):
         """

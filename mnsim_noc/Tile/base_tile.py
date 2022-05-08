@@ -76,6 +76,7 @@ class BaseTile(Component):
         # first for the running state, can change to idle
         if self.running_state:
             if current_time >= self.computation_end_time:
+                # PHASE: Tile COMPUTATION DONE
                 # get computation
                 computation = self.computation_list[self.computation_id][0]
                 # modify state
@@ -94,8 +95,10 @@ class BaseTile(Component):
         computation = self.computation_list[self.computation_id][0]
         # for idle state, running state is False
         # check if the computation can run
+        # PHASE: TILE COMPUTATION JUDGE
         if self.input_buffer.check_data_already(computation["wait"]) \
             and self.output_buffer.check_enough_space(computation["output"]):
+            # PHASE: TILE COMPUTATION START
             self.running_state = True
             self.computation_list[self.computation_id][1] = "running"
             assert computation["latency"] > 0, "latency should be positive"
@@ -104,6 +107,7 @@ class BaseTile(Component):
             return None
         else:
             self.computation_end_time = float("inf")
+            return None
 
     def get_computation_end_time(self):
         """

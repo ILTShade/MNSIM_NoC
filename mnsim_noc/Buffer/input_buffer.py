@@ -11,7 +11,6 @@
 """
 from mnsim_noc.Buffer.base_buffer import BaseBuffer, get_data_size
 
-
 class InputBuffer(BaseBuffer):
     """
     input behavior buffer

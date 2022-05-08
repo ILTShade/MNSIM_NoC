@@ -9,9 +9,8 @@
 @CreateTime:
     2022/05/07 19:53
 """
-from prometheus_client import REGISTRY
 from mnsim_noc.utils.component import Component
-from mnsim_noc.Buffer import OutputBuffer
+from mnsim_noc.Buffer.output_buffer import OutputBuffer
 
 class MultiOutputBuffer(Component):
     """
@@ -49,6 +48,9 @@ class MultiOutputBuffer(Component):
             output_buffer.add_data_list(data_list)
 
     def next_transfer_data(self, target_tile_id):
+        """
+        get the next transfer data of the target tile id
+        """
         return self.output_buffer_list[str(target_tile_id)].next_transfer_data()
 
     def delete_data_list(self, data_list, target_tile_id):
