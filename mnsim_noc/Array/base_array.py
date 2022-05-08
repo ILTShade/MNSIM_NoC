@@ -39,7 +39,7 @@ class BaseArray(Component):
         update_module = self.mapping_strategy.get_update_order(
             self.tile_list, self.communication_list
         )
-        time_point_list = []
+        self.time_point_list = []
         while True:
             # running the data
             for module in update_module:
@@ -57,5 +57,10 @@ class BaseArray(Component):
             if current_time == float("inf"):
                 break
             else:
-                time_point_list.append(current_time)
-        return time_point_list
+                self.time_point_list.append(current_time)
+
+    def check_finish(self):
+        """
+        check if the simulation is over and right
+        """
+        # check if the tile is finished
