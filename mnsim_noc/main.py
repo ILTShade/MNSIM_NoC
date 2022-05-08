@@ -12,10 +12,11 @@ import pickle
 from mnsim_noc.utils.yaml_io import read_yaml
 from mnsim_noc.Array import BaseArray
 
-@click.group(help="mnsim noc behavior driven simulation")
-def main(array_config_path):
+@click.command(help="mnsim noc behavior driven simulation")
+@click.option("--config", type=str, default="config.yaml", help="config file path")
+def main(config):
     # load array config
-    array_config = read_yaml(array_config_path)
+    array_config = read_yaml(config)
     # load array config
     image_num = array_config.get("image_num", 1)
     tile_net_shape = (

@@ -133,4 +133,4 @@ def test_array():
     test array in behavior driven
     """
     array = BaseArray(get_test_config(), 2, (3, 3), (4096, 4096), 1)
-    print(len(array.run()))
+    array.run()

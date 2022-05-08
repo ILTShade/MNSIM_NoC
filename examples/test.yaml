@@ -1,2 +1,8 @@
-array_type: time_slice_array
-
+image_num: 2
+tile_array_row: 3
+tile_array_col: 3
+input_buffer_size: 32768
+output_buffer_size: 32768
+band_width: 1
+task_config_path_list:
+  - examples/test.pkl
