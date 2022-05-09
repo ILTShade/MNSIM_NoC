@@ -38,11 +38,30 @@ class BaseArray(Component):
             task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
         )
         self.tile_list, self.communication_list, self.wire_net = self.mapping_strategy.mapping_net()
+        # show the array
+        self.logger.info(f"There are {len(self.tile_list)} TILES and {len(self.communication_list)} COMMUNICATIONS")
+        self._get_behavior_number(task_behavior_list)
         # set transparent
         self.wire_net.set_transparent_flag(transparent_flag)
         self.schedule_strategy = Schedule.get_class_(schedule_strategy)(
             self.communication_list, self.wire_net
         )
+
+    def _get_behavior_number(self, task_behavior_list):
+        """
+        get the behavior number
+        """
+        behavior_number = []
+        for i, task_behavior in enumerate(task_behavior_list):
+            task_behavior_number = 0
+            for tile_behavior in task_behavior:
+                repeated_number = 1
+                if tile_behavior["target_tile_id"] != [-1]:
+                    repeated_number += len(tile_behavior["target_tile_id"])
+                task_behavior_number += len(tile_behavior["dependence"]) * repeated_number
+            behavior_number.append(task_behavior_number)
+        # logger
+        self.logger.info(f"\tThere are {sum(behavior_number)} behaviors in single image")
 
     def run(self):
         """

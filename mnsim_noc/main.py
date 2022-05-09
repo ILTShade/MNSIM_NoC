@@ -29,8 +29,8 @@ def main(config, task, mapping_strategy, schedule_strategy, transprent_flag):
         array_config.get("tile_array_col", 16)
     )
     buffer_size = (
-        array_config.get("input_buffer_size", 32768),
-        array_config.get("output_buffer_size", 32768)
+        array_config.get("input_buffer_size", 822400),
+        array_config.get("output_buffer_size", 822400)
     ) # default 32768 bits, 4KB
     band_width = array_config.get("band_width", 1) # default, 1Gbps
     mapping_strategy = array_config.get("mapping_strategy", "naive") \

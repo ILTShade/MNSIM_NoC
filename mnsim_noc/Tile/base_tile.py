@@ -137,9 +137,9 @@ class BaseTile(Component):
         """
         assert self.running_state == False, "running_state should be idle"
         assert self.computation_id == len(self.computation_list), \
-            "computation_id should to the end of the list"
+            f"{self.tile_id} computation_id should to the end of the list"
         assert self.computation_end_time == float("inf"), \
-            "computation_end_time should be inf"
+            f"{self.tile_id} computation_end_time should be inf"
         self.input_buffer.check_finish()
         self.output_buffer.check_finish()
 

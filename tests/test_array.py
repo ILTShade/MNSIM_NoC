@@ -137,5 +137,8 @@ def test_array():
     """
     test array in behavior driven
     """
+    # import pickle
+    # with open("tmp.pkl", "wb") as f:
+    #     pickle.dump(get_test_config()[0], f)
     array = BaseArray(get_test_config(), 2, (3, 3), (4096, 4096), 1, transparent_flag=True)
     array.run()
