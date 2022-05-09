@@ -9,7 +9,7 @@
 @CreateTime:
     2022/05/07 11:09
 """
-from mnsim_noc.Buffer import InputBuffer
+from mnsim_noc.Buffer.input_buffer import InputBuffer
 from mnsim_noc.Buffer.output_buffer import OutputBuffer
 
 def test_buffer():
@@ -18,10 +18,10 @@ def test_buffer():
     """
     # buffer data example
     data_list = [
-        [0, 0, 0, 3, 9, 3, 0, 0, -1],
-        [0, 1, 0, 3, 9, 3, 0, 0, -1],
-        [1, 0, 0, 3, 9, 3, 0, 0, -1],
-        [1, 1, 0, 3, 9, 3, 0, 0, -1],
+        [0, 0, 0, 3, 9, 3, 0, 0, -1, 0],
+        [0, 1, 0, 3, 9, 3, 0, 0, -1, 0],
+        [1, 0, 0, 3, 9, 3, 0, 0, -1, 0],
+        [1, 1, 0, 3, 9, 3, 0, 0, -1, 0],
     ]
     # init input buffer, with data and transfer data list
     input_buffer = InputBuffer(256)

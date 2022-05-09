@@ -22,33 +22,34 @@ def get_test_config():
         "layer_id": 0,
         "tile_id": 0,
         "target_tile_id": [1],
+        "source_tile_id": [-1],
         "dependence": [
             {
-                "wait": [[1, 1, 0, 3, 9, 3, None, -1, -1]],
-                "output": [[0, 0, 0, 3, 9, 3, None, 0, -1]],
+                "wait": [[1, 1, 0, 3, 9, 3, None, None, -1, None]],
+                "output": [[0, 0, 0, 3, 9, 3, None, 0, -1, 0]],
                 "drop": [],
                 "latency": 4
             },
             {
-                "wait": [[1, 1, 0, 3, 9, 3, None, -1, -1]],
-                "output": [[0, 1, 0, 3, 9, 3, None, 0, -1]],
+                "wait": [[1, 1, 0, 3, 9, 3, None, None, -1, None]],
+                "output": [[0, 1, 0, 3, 9, 3, None, 0, -1, 0]],
                 "drop": [],
                 "latency": 2
             },
             {
-                "wait": [[1, 1, 0, 3, 9, 3, None, -1, -1]],
-                "output": [[1, 0, 0, 3, 9, 3, None, 0, -1]],
+                "wait": [[1, 1, 0, 3, 9, 3, None, None, -1, None]],
+                "output": [[1, 0, 0, 3, 9, 3, None, 0, -1, 0]],
                 "drop": [],
                 "latency": 3
             },
             {
-                "wait": [[1, 1, 0, 3, 9, 3, None, -1, -1]],
-                "output": [[1, 1, 0, 3, 9, 3, None, 0, -1]],
+                "wait": [[1, 1, 0, 3, 9, 3, None, None, -1, None]],
+                "output": [[1, 1, 0, 3, 9, 3, None, 0, -1, 0]],
                 "drop": [
-                    [0, 0, 0, 3, 9, 3, None, -1, -1],
-                    [0, 1, 0, 3, 9, 3, None, -1, -1],
-                    [1, 0, 0, 3, 9, 3, None, -1, -1],
-                    [1, 1, 0, 3, 9, 3, None, -1, -1],
+                    [0, 0, 0, 3, 9, 3, None, None, -1, None],
+                    [0, 1, 0, 3, 9, 3, None, None, -1, None],
+                    [1, 0, 0, 3, 9, 3, None, None, -1, None],
+                    [1, 1, 0, 3, 9, 3, None, None, -1, None],
                 ],
                 "latency": 7
             },
@@ -60,21 +61,22 @@ def get_test_config():
         "layer_id": 1,
         "tile_id": 1,
         "target_tile_id": [2, 3],
+        "source_tile_id": [0],
         "dependence": [
             {
                 "wait": [
-                    [0, 0, 0, 3, 9, 3, None, 0, -1],
-                    [0, 1, 0, 3, 9, 3, None, 0, -1],
-                    [1, 0, 0, 3, 9, 3, None, 0, -1],
-                    [1, 1, 0, 3, 9, 3, None, 0, -1],
+                    [0, 0, 0, 3, 9, 3, None, 0, -1, 0],
+                    [0, 1, 0, 3, 9, 3, None, 0, -1, 0],
+                    [1, 0, 0, 3, 9, 3, None, 0, -1, 0],
+                    [1, 1, 0, 3, 9, 3, None, 0, -1, 0],
                 ],
-                "output": [[0, 0, 0, 3, 9, 3, None, 1, -1]],
+                "output": [[0, 0, 0, 3, 9, 3, None, 1, -1, 1]],
                 "latency": 9,
                 "drop": [
-                    [0, 0, 0, 3, 9, 3, None, 0, -1],
-                    [0, 1, 0, 3, 9, 3, None, 0, -1],
-                    [1, 0, 0, 3, 9, 3, None, 0, -1],
-                    [1, 1, 0, 3, 9, 3, None, 0, -1],
+                    [0, 0, 0, 3, 9, 3, None, 0, -1, 0],
+                    [0, 1, 0, 3, 9, 3, None, 0, -1, 0],
+                    [1, 0, 0, 3, 9, 3, None, 0, -1, 0],
+                    [1, 1, 0, 3, 9, 3, None, 0, -1, 0],
                 ],
             },
         ]
@@ -85,12 +87,13 @@ def get_test_config():
         "layer_id": 2,
         "tile_id": 2,
         "target_tile_id": [3],
+        "source_tile_id": [1],
         "dependence": [
             {
-                "wait": [[0, 0, 0, 3, 9, 3, None, 1, -1]],
-                "output": [[0, 0, 0, 3, 9, 3, None, 2, -1]],
+                "wait": [[0, 0, 0, 3, 9, 3, None, 1, -1, 1]],
+                "output": [[0, 0, 0, 3, 9, 3, None, 2, -1, 2]],
                 "latency": 7,
-                "drop": [[0, 0, 0, 3, 9, 3, None, 1, -1]],
+                "drop": [[0, 0, 0, 3, 9, 3, None, 1, -1, 1]],
             },
         ]
     }
@@ -100,12 +103,13 @@ def get_test_config():
         "layer_id": 3,
         "tile_id": 3,
         "target_tile_id": [4],
+        "source_tile_id": [1, 2],
         "dependence": [
             {
-                "wait": [[0, 0, 0, 3, 9, 3, None, 1, -1], [0, 0, 0, 3, 9, 3, None, 2, -1]],
-                "output": [[0, 0, 0, 3, 9, 3, None, 3, -1]],
+                "wait": [[0, 0, 0, 3, 9, 3, None, 1, -1, 1], [0, 0, 0, 3, 9, 3, None, 2, -1, 2]],
+                "output": [[0, 0, 0, 3, 9, 3, None, 3, -1, 3]],
                 "latency": 6,
-                "drop": [[0, 0, 0, 3, 9, 3, None, 1, -1], [0, 0, 0, 3, 9, 3, None, 2, -1]],
+                "drop": [[0, 0, 0, 3, 9, 3, None, 1, -1, 1], [0, 0, 0, 3, 9, 3, None, 2, -1, 2]],
             },
         ]
     }
@@ -114,13 +118,14 @@ def get_test_config():
         "task_id": None,
         "layer_id": 4,
         "tile_id": 4,
-        "target_tile_id": [],
+        "target_tile_id": [-1],
+        "source_tile_id": [3],
         "dependence": [
             {
-                "wait": [[0, 0, 0, 3, 9, 3, None, 3, -1]],
-                "output": [[0, 0, 0, 3, 9, 3, None, 4, -1]],
+                "wait": [[0, 0, 0, 3, 9, 3, None, 3, -1, 3]],
+                "output": [[0, 0, 0, 3, 9, 3, None, 4, -1, 4]],
                 "latency": 5,
-                "drop": [[0, 0, 0, 3, 9, 3, None, 3, -1]],
+                "drop": [[0, 0, 0, 3, 9, 3, None, 3, -1, 3]],
             },
         ]
     }

@@ -9,7 +9,7 @@
 """
 import copy
 from mnsim_noc.utils.component import Component
-from mnsim_noc.Buffer import InputBuffer, MultiOutputBuffer
+from mnsim_noc.Buffer import MultiInputBuffer, MultiOutputBuffer
 
 class BaseTile(Component):
     """
@@ -37,9 +37,9 @@ class BaseTile(Component):
         self.tile_id = tile_behavior_cfg["tile_id"] # value
         self.layer_id = tile_behavior_cfg["layer_id"] # value
         self.target_tile_id = tile_behavior_cfg["target_tile_id"] # this is a list
-        self.merge_flag = tile_behavior_cfg.get("merge_flag", False)
+        self.source_tile_id = tile_behavior_cfg["source_tile_id"] # this is a list
         # input buffer and output buffer
-        self.input_buffer = InputBuffer(buffer_size[0])
+        self.input_buffer = MultiInputBuffer(buffer_size[0], self.source_tile_id)
         self.output_buffer = MultiOutputBuffer(buffer_size[1], self.target_tile_id)
         # running state, False for idle, True for running
         self.running_state = False

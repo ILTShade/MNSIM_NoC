@@ -23,18 +23,19 @@ def test_communication():
         "layer_id": 0,
         "tile_id": 0,
         "target_tile_id": [1],
+        "source_tile_id": [-1],
         "dependence": [
             {
-                "wait": [[0, 0, 0, 3, 9, 3, None, -1, -1]],
-                "output": [[0, 0, 0, 3, 9, 3, None, 0, -1]],
+                "wait": [[0, 0, 0, 3, 9, 3, None, None, -1, None]],
+                "output": [[0, 0, 0, 3, 9, 3, None, 0, -1, 0]],
                 "latency": 1,
-                "drop": [[0, 0, 0, 3, 9, 3, None, -1, -1]]
+                "drop": [[0, 0, 0, 3, 9, 3, None, None, -1, None]]
             },
             {
-                "wait": [[0, 1, 0, 3, 9, 3, None, -1, -1]],
-                "output": [[0, 1, 0, 3, 9, 3, None, 0, -1]],
+                "wait": [[0, 1, 0, 3, 9, 3, None, None, -1, None]],
+                "output": [[0, 1, 0, 3, 9, 3, None, 0, -1, 0]],
                 "latency": 100,
-                "drop": [[0, 1, 0, 3, 9, 3, None, -1, -1]]
+                "drop": [[0, 1, 0, 3, 9, 3, None, None, -1, None]]
             },
         ]
     }
@@ -45,23 +46,23 @@ def test_communication():
         "layer_id": 1,
         "tile_id": 1,
         "target_tile_id": [-1],
+        "source_tile_id": [0],
         "dependence": [
             {
-                "wait": [[0, 0, 0, 3, 9, 3, None, 0, -1]],
-                "output": [[0, 0, 0, 3, 9, 3, None, 1, -1]],
+                "wait": [[0, 0, 0, 3, 9, 3, None, 0, -1, 0]],
+                "output": [[0, 0, 0, 3, 9, 3, None, 1, -1, 1]],
                 "latency": 1,
-                "drop": [[0, 0, 0, 3, 9, 3, None, 0, -1]]
+                "drop": [[0, 0, 0, 3, 9, 3, None, 0, -1, 0]]
             },
             {
-                "wait": [[0, 1, 0, 3, 9, 3, None, 0, -1]],
-                "output": [[0, 1, 0, 3, 9, 3, None, 1, -1]],
+                "wait": [[0, 1, 0, 3, 9, 3, None, 0, -1, 0]],
+                "output": [[0, 1, 0, 3, 9, 3, None, 1, -1, 1]],
                 "latency": 1,
-                "drop": [[0, 1, 0, 3, 9, 3, None, 0, -1]]
+                "drop": [[0, 1, 0, 3, 9, 3, None, 0, -1, 0]]
             },
         ]
     }
     tile_2 = BaseTile((0, 1), 2, (4096, 4096), tile_behavior_cfg_2)
-    tile_1.input_buffer.set_start()
     # wire net
     wire_net = WireNet((2, 2), 10)
     # for communication

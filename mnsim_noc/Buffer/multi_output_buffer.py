@@ -22,9 +22,9 @@ class MultiOutputBuffer(Component):
         super(MultiOutputBuffer, self).__init__()
         # init multi output buffer, id with target
         self.output_target_id = output_target_id
-        self.output_buffer_list = dict()
+        self.output_buffer_dict = dict()
         for target_tile_id in self.output_target_id:
-            self.output_buffer_list[str(target_tile_id)] = \
+            self.output_buffer_dict[str(target_tile_id)] = \
                 OutputBuffer(buffer_size)
         # assert output target id
         assert len(output_target_id) > 0, "output target id is empty"
@@ -36,7 +36,7 @@ class MultiOutputBuffer(Component):
         check if the buffer has enough space to add the data
         """
         enough = [output_buffer.check_enough_space(data_list)
-            for output_buffer in self.output_buffer_list.values()
+            for output_buffer in self.output_buffer_dict.values()
         ]
         return all(enough)
 
@@ -44,31 +44,31 @@ class MultiOutputBuffer(Component):
         """
         add data list to the buffer
         """
-        for output_buffer in self.output_buffer_list.values():
+        for output_buffer in self.output_buffer_dict.values():
             output_buffer.add_data_list(data_list)
 
     def next_transfer_data(self, target_tile_id):
         """
         get the next transfer data of the target tile id
         """
-        return self.output_buffer_list[str(target_tile_id)].next_transfer_data()
+        return self.output_buffer_dict[str(target_tile_id)].next_transfer_data()
 
     def delete_data_list(self, data_list, target_tile_id):
         """
         delete data list from the buffer
         """
-        return self.output_buffer_list[str(target_tile_id)].delete_data_list(data_list)
+        return self.output_buffer_dict[str(target_tile_id)].delete_data_list(data_list)
 
     def set_end(self):
         """
         set end flag
         """
-        for output_buffer in self.output_buffer_list.values():
+        for output_buffer in self.output_buffer_dict.values():
             output_buffer.set_end()
 
     def check_finish(self):
         """
         check if the buffer is finished
         """
-        for output_buffer in self.output_buffer_list.values():
+        for output_buffer in self.output_buffer_dict.values():
             output_buffer.check_finish()

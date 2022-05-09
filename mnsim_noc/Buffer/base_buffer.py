@@ -14,9 +14,15 @@ from mnsim_noc.utils.component import Component
 def get_data_size(data):
     """
     get the size of the data
-    (x, y, start, end, bit, total, image_id, layer_id, tile_id)
+    (x, y, start, end, bit, total, image_id, layer_id, in_id, tile_id)
     """
     return (data[3] - data[2]) * data[4]
+
+def get_data_tile(data):
+    """
+    check if the data is from the tile
+    """
+    return data[9]
 
 class BaseBuffer(Component):
     """

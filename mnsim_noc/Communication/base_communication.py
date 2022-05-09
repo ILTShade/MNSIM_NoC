@@ -33,6 +33,7 @@ class BaseCommunication(Component):
         self.output_buffer = self.input_tile.output_buffer
         self.input_buffer = self.output_tile.input_buffer
         self.target_tile_id = self.output_tile.tile_id
+        self.source_tile_id = self.input_tile.tile_id
         # state
         self.running_state = False
         self.communication_end_time = float("inf")
@@ -51,7 +52,7 @@ class BaseCommunication(Component):
                 # PHASE COMMUNICATION END
                 # NO next communication
                 self.running_state = False
-                self.input_buffer.add_data_list(self.transfer_data)
+                self.input_buffer.add_data_list(self.transfer_data, self.source_tile_id)
                 # clear transfer data path
                 self.wire_net.set_data_path_state(self.transfer_path, False)
 
@@ -65,7 +66,7 @@ class BaseCommunication(Component):
         # PHASE COMMUNICATION JUDGE
         self.transfer_data = self.output_buffer.next_transfer_data(self.target_tile_id)
         if self.transfer_data is not None \
-            and self.input_buffer.check_enough_space(self.transfer_data):
+            and self.input_buffer.check_enough_space(self.transfer_data, self.source_tile_id):
             return True
         return False
 
@@ -82,7 +83,7 @@ class BaseCommunication(Component):
         self.running_state = True
         self.transfer_path = trasnfer_path
         # set buffer
-        self.input_buffer.add_transfer_data_list(self.transfer_data)
+        self.input_buffer.add_transfer_data_list(self.transfer_data, self.source_tile_id)
         self.output_buffer.delete_data_list(self.transfer_data, self.target_tile_id)
         # get transfet time
         transfer_end_time = self.wire_net.get_wire_transfer_time(trasnfer_path, self.transfer_data, current_time)

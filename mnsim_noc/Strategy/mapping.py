@@ -44,8 +44,7 @@ class Mapping(Component):
         """
         tile_behavior_list = []
         for task_id, task_behavior in enumerate(self.task_behavior_list):
-            # modify the tile task id and the last target
-            task_behavior[-1]["target_tile_id"] = [-1]
+            # modify the tile task id
             for tile_behavior in task_behavior:
                 tile_behavior["task_id"] = task_id
                 tile_behavior_list.append(tile_behavior)
@@ -56,10 +55,6 @@ class Mapping(Component):
         for position, tile_behavior in zip(position_list, tile_behavior_list):
             tile = BaseTile(position, self.image_num, self.buffer_size, tile_behavior)
             tile_list.append(tile)
-        # set buffer as start
-        for tile in tile_list:
-            if tile.layer_id == 0 and not tile.merge_flag:
-                tile.input_buffer.set_start()
         # get wire net
         wire_net = WireNet((self.tile_row, self.tile_column), self.band_width)
         # communication list
