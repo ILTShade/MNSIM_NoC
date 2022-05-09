@@ -23,6 +23,17 @@ class BaseArray(Component):
         mapping_strategy="naive", schedule_strategy="naive", transparent_flag=False
     ):
         super(BaseArray, self).__init__()
+        # logging
+        self.logger.info("Initializing the array")
+        self.logger.info(f"\tThere are {len(task_behavior_list)} tasks")
+        for i, task_behavior in enumerate(task_behavior_list):
+            self.logger.info(f"\t\tTask {i} need {len(task_behavior)} tiles")
+        self.logger.info(f"\tThe image number is {image_num}")
+        self.logger.info(f"\tThe tile net shape is {tile_net_shape}")
+        self.logger.info(f"\tThe buffer size is {buffer_size}")
+        self.logger.info(f"\tThe band width is {band_width}")
+        self.logger.info(f"\tStartegy are {mapping_strategy}, {schedule_strategy}, {transparent_flag}")
+        # init
         self.mapping_strategy = Mapping.get_class_(mapping_strategy)(
             task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
         )
@@ -90,8 +101,8 @@ class BaseArray(Component):
         def _get_str(load_rate):
             return " ".join([f"{x:.3f}" for x in load_rate]) + \
                 f", max is {max(load_rate):.4f}"
-        print("Total time: {} ns".format(end_time))
-        print("For the tile")
-        print(_get_str(tile_load_rate))
-        print("For the communication")
-        print(_get_str(communication_load_rate))
+        self.logger.info(f"Total computation time is {end_time}")
+        # print("For the tile")
+        # print(_get_str(tile_load_rate))
+        # print("For the communication")
+        # print(_get_str(communication_load_rate))
