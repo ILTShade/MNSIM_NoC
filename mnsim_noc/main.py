@@ -30,6 +30,7 @@ def main(config):
     band_width = array_config.get("band_width", 1) # default, 1Gbps
     mapping_strategy = array_config.get("mapping_strategy", "naive")
     schedule_strategy = array_config.get("schedule_strategy", "naive")
+    transparent_flag = array_config.get("transparent_flag", False)
     # load task config behavior list
     task_config_path_list = array_config.get("task_config_path_list", [])
     assert len(task_config_path_list) > 0, "task config path list is empty"
@@ -41,7 +42,7 @@ def main(config):
     array = BaseArray(
         task_behavior_list, image_num,
         tile_net_shape, buffer_size, band_width,
-        mapping_strategy, schedule_strategy
+        mapping_strategy, schedule_strategy, transparent_flag
     )
     # array run and show config
     array.run()

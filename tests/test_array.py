@@ -137,5 +137,5 @@ def test_array():
     """
     test array in behavior driven
     """
-    array = BaseArray(get_test_config(), 2, (3, 3), (4096, 4096), 1)
+    array = BaseArray(get_test_config(), 2, (3, 3), (4096, 4096), 1, transparent_flag=True)
     array.run()

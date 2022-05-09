@@ -20,13 +20,15 @@ class BaseArray(Component):
     """
     def __init__(self, task_behavior_list, image_num,
         tile_net_shape, buffer_size, band_width,
-        mapping_strategy="naive", schedule_strategy="naive"
+        mapping_strategy="naive", schedule_strategy="naive", transparent_flag=False
     ):
         super(BaseArray, self).__init__()
         self.mapping_strategy = Mapping.get_class_(mapping_strategy)(
             task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
         )
         self.tile_list, self.communication_list, self.wire_net = self.mapping_strategy.mapping_net()
+        # set transparent
+        self.wire_net.set_transparent_flag(transparent_flag)
         self.schedule_strategy = Schedule.get_class_(schedule_strategy)(
             self.communication_list, self.wire_net
         )
