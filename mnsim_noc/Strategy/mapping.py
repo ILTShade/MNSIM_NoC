@@ -107,3 +107,28 @@ class NaiveMapping(Mapping):
             position_column = i % self.tile_column
             position_list.append((position_row, position_column))
         return position_list
+
+class SnakeMapping(Mapping):
+    """
+    snake mapping
+    """
+    NAME = "snake"
+    def _get_position_list(self, tile_behavior_list):
+        """
+        get position list
+        0, 1, 8,
+        3, 2, 7,
+        4, 5, 6,
+        """
+        position_list = []
+        for i in range(min(self.tile_row, self.tile_column)):
+            # get position
+            row = [(i, j) for j in range(0, i)]
+            point = [(i, i)]
+            column = [(j, i) for j in range(i-1, -1, -1)]
+            line = row + point + column
+            line = line[::-1] if i % 2 == 1 else line
+            # add to position list
+            position_list += line
+        # return list
+        return position_list[:len(tile_behavior_list)]

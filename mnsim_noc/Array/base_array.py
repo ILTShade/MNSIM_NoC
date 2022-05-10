@@ -120,7 +120,7 @@ class BaseArray(Component):
         def _get_str(load_rate):
             return " ".join([f"{x:.3f}" for x in load_rate]) + \
                 f", max is {max(load_rate):.4f}"
-        self.logger.info(f"Total computation time is {end_time}")
+        self.logger.info(f"Total computation time is {end_time/1e6:.3f} ms")
         # print("For the tile")
         # print(_get_str(tile_load_rate))
         # print("For the communication")
