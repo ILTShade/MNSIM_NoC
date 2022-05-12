@@ -78,14 +78,16 @@ class Mapping(Component):
         for tile in tile_list:
             # first, communication output tile is this tile
             for communication in communication_list:
-                if communication.output_tile is tile and id(communication) not in communication_in_ids:
+                if communication.output_tile is tile and \
+                    id(communication) not in communication_in_ids:
                     communication_in_ids.append(id(communication))
                     update_module.append(communication)
             # this tile
             update_module.append(tile)
             # last for the communication input tile is this tile
             for communication in communication_list:
-                if communication.input_tile is tile and id(communication) not in communication_in_ids:
+                if communication.input_tile is tile and \
+                    id(communication) not in communication_in_ids:
                     communication_in_ids.append(id(communication))
                     update_module.append(communication)
         return update_module

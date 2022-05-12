@@ -7,11 +7,13 @@
 @CreateTime:
     2021/10/08 18:48
 """
-from argparse import Action
-import click
 import pickle
-from mnsim_noc.utils.yaml_io import read_yaml
+
+import click
+
 from mnsim_noc.Array import BaseArray
+from mnsim_noc.utils.yaml_io import read_yaml
+
 
 @click.command(help="mnsim noc behavior driven simulation")
 @click.option("--config", type=str, default="config.yaml", help="config file path")
@@ -20,6 +22,9 @@ from mnsim_noc.Array import BaseArray
 @click.option("--schedule_strategy", "-S", type=str, help="schedule strategy")
 @click.option("--transprent_flag", "-T", is_flag=True, default=False, help="transparent mode")
 def main(config, task, mapping_strategy, schedule_strategy, transprent_flag):
+    """
+    main function
+    """
     # load array config
     array_config = read_yaml(config)
     # load array config

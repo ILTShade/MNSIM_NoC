@@ -19,7 +19,7 @@ LEVEL = "info"
 if "MNSIM_NOC_LOG_LEVEL" in os.environ:
     LEVEL = os.environ["MNSIM_NOC_LOG_LEVEL"]
 LEVEL = getattr(logging, LEVEL.upper())
-LOG_FORMAT = "%(asctime)s %(name)-16s %(levelname)7s: %(message)s"
+LOG_FORMAT = "%(asctime)s %(filename)-10s [line:%(lineno)-3d] %(levelname)-5s: %(message)s"
 logging.basicConfig(
     stream=sys.stdout, level=LEVEL,
     format=LOG_FORMAT, datefmt="%m/%d %I:%M:%S %p"
@@ -27,6 +27,9 @@ logging.basicConfig(
 
 logger = logging.getLogger()
 def addFile(self, filename):
+    """
+    add file handler
+    """
     handler = logging.FileHandler(filename)
     handler.setFormatter(logging.Formatter(LOG_FORMAT))
     self.addHandler(handler)
@@ -34,4 +37,7 @@ def addFile(self, filename):
 logging.Logger.addFile = addFile
 
 def getLogger(name):
+    """
+    get logger
+    """
     return logger.getChild(name)
