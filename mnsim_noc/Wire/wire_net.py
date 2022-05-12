@@ -9,6 +9,7 @@
 @CreateTime:
     2022/05/07 17:20
 """
+import numpy as np
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Wire.base_wire import BaseWire
 
@@ -35,6 +36,7 @@ class WireNet(Component):
         """
         super(WireNet, self).__init__()
         # init wire net
+        self.tile_net_shape = tile_net_shape
         self.wires = []
         self.wires_map = {}
         # horizontally wire
@@ -102,3 +104,25 @@ class WireNet(Component):
         """
         for wire in self.wires:
             assert wire.get_wire_state() == False
+
+    def get_running_rate(self, end_time):
+        """
+        show wire rate, two decimal places
+        """
+        horizontal_rate = np.zeros(
+            [self.tile_net_shape[0], self.tile_net_shape[1] - 1]
+        )
+        for i in range(self.tile_net_shape[0]):
+            for j in range(self.tile_net_shape[1] - 1):
+                wire_position = ((i, j), (i, j + 1))
+                horizontal_rate[i, j] = \
+                    self.wires_map[_get_map_key(wire_position)].get_running_rate(end_time)
+        vectical_rate = np.zeros(
+            [self.tile_net_shape[0] - 1, self.tile_net_shape[1]]
+        )
+        for i in range(self.tile_net_shape[0] - 1):
+            for j in range(self.tile_net_shape[1]):
+                wire_position = ((i, j), (i + 1, j))
+                vectical_rate[i, j] = \
+                    self.wires_map[_get_map_key(wire_position)].get_running_rate(end_time)
+        return horizontal_rate, vectical_rate

@@ -142,7 +142,7 @@ class BaseTile(Component):
         self.input_buffer.check_finish()
         self.output_buffer.check_finish()
 
-    def get_simulation_result(self, end_time):
+    def get_running_rate(self, end_time):
         """
         get the simulation result
         """

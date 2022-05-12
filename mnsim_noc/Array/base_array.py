@@ -7,6 +7,7 @@
 @CreateTime:
     2021/10/08 18:21
 """
+import numpy as np
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -48,6 +49,7 @@ class BaseArray(Component):
         )
         # time point list
         self.image_num = image_num
+        self.tile_net_shape = tile_net_shape
         self.time_point_list = []
 
     def _get_behavior_number(self, task_behavior_list):
@@ -168,26 +170,55 @@ class BaseArray(Component):
                 self.logger.info(
                     f"\tImage {i} range is {sl[0]/1e6:.3f} ms to {sl[1]/1e6:.3f} ms"
                 )
+        return complete_time
+
+    def show_tile_wire_rate(self):
+        """
+        show the tile and wire running rate
+        """
+        # show the tile and wire running rate
+        end_time = self.time_point_list[-1]
+        tile_task_id = np.zeros(self.tile_net_shape, dtype=np.int)
+        tile_load_rate = np.zeros(self.tile_net_shape)
+        for tile in self.tile_list:
+            position = tile.position
+            tile_task_id[position] = tile.task_id + 1 # start from 1
+            tile_load_rate[position] = tile.get_running_rate(end_time)
+        horizontal_rate, vectical_rate = self.wire_net.get_running_rate(end_time)
+        # get show tile row and show tile column
+        show_tile_row = max([tile.position[0] for tile in self.tile_list]) + 1
+        show_tile_column = max([tile.position[1] for tile in self.tile_list]) + 1
+        # logger
+        self.logger.info("For the tile")
+        for i in range(show_tile_row):
+            self.logger.info("-".join([
+                f"{tile_task_id[i,j]},{tile_load_rate[i,j]:.3f}" \
+                for j in range(show_tile_column)
+            ]))
+            if i != show_tile_row-1:
+                self.logger.info(" ".join([
+                    "   |   " for _ in range(show_tile_column)
+                ]))
+        # logger
+        self.logger.info("For the wire")
+        for i in range(show_tile_row):
+            row_str = ""
+            for j in range(show_tile_column - 1):
+                row_str += f"{tile_task_id[i,j]}-{horizontal_rate[i,j]:.3f}-"
+            self.logger.info(row_str + f"{tile_task_id[i, show_tile_column-1]}")
+            # vectical
+            split_str = "   ".join(["|    " for _ in range(show_tile_column)])
+            if i != show_tile_row-1:
+                self.logger.info(split_str)
+                self.logger.info("   ".join([
+                    f"{vectical_rate[i,j]:.3f}" for _ in range(show_tile_column)
+                ]))
+                self.logger.info(split_str)
+        return tile_task_id, tile_load_rate, horizontal_rate, vectical_rate
 
     def show_simulation_result(self):
         """
         show the simulation result
         """
         self.show_latency_throughput()
-        # show the tile result
-        end_time = self.time_point_list[-1]
-        tile_load_rate = [tile.get_simulation_result(end_time) for tile in self.tile_list]
-        communication_load_rate = [
-            communication.get_simulation_result(end_time)
-            for communication in self.communication_list
-        ]
-        # inline function
-        def _get_str(load_rate):
-            return " ".join([f"{x:.3f}" for x in load_rate]) + \
-                f", max is {max(load_rate):.4f}"
-        self.logger.info(f"Total computation time is {end_time/1e6:.3f} ms")
-        # print("For the tile")
-        # print(_get_str(tile_load_rate))
-        # print("For the communication")
-        # print(_get_str(communication_load_rate))
-        return tile_load_rate, communication_load_rate
+        self.show_tile_wire_rate()

@@ -37,16 +37,17 @@ class BaseWire(Component):
         """
         set the wire state
         """
-        if self.transparent_flag:
-            return None
-        assert wire_state != self.running_state
-        self.running_state = wire_state
+        # add the transfer time range
         if wire_state == True:
             # add new range
             self.transfer_time_range.append([current_time])
         else:
             # add end time
             self.transfer_time_range[-1].append(current_time)
+        if self.transparent_flag:
+            return None
+        assert wire_state != self.running_state
+        self.running_state = wire_state
         return None
 
     def get_wire_state(self):
@@ -62,3 +63,10 @@ class BaseWire(Component):
         set the transparent flag
         """
         self.transparent_flag = transparent_flag
+
+    def get_running_rate(self, end_time):
+        """
+        get the running rate
+        """
+        transfer_total_time = sum([end-start for start, end in self.transfer_time_range])
+        return transfer_total_time * 1. / end_time

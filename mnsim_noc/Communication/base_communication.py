@@ -115,7 +115,7 @@ class BaseCommunication(Component):
         assert self.communication_end_time == float("inf"), \
             "communication end time should be inf"
 
-    def get_simulation_result(self, end_time):
+    def get_running_rate(self, end_time):
         """
         get the simulation result
         """
