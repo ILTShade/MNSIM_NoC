@@ -81,12 +81,12 @@ class WireNet(Component):
         ]
         return any(all_state)
 
-    def set_data_path_state(self, transfer_path, state, current_time):
+    def set_data_path_state(self, transfer_path, state, communication_id, current_time):
         """
         set data path state, and record transfer range time
         """
         for path in transfer_path:
-            self.wires_map[_get_map_key(path)].set_wire_state(state, current_time)
+            self.wires_map[_get_map_key(path)].set_wire_state(state, communication_id, current_time)
 
     def get_wire_transfer_time(self, transfer_path, data_list):
         """

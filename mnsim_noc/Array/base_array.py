@@ -221,4 +221,4 @@ class BaseArray(Component):
         show the simulation result
         """
         self.show_latency_throughput()
-        self.show_tile_wire_rate()
+        # self.show_tile_wire_rate()

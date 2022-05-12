@@ -41,6 +41,10 @@ class BaseCommunication(Component):
         # transfer data and path
         self.transfer_data = None
         self.transfer_path = None
+        # set communication id
+        self.communication_id = \
+            f"{input_tile.task_id},{input_tile.tile_id}"+\
+            f"->{output_tile.task_id},{output_tile.tile_id}"
 
     def update(self, current_time):
         """
@@ -54,7 +58,9 @@ class BaseCommunication(Component):
                 self.running_state = False
                 self.input_buffer.add_data_list(self.transfer_data, self.source_tile_id)
                 # clear transfer data path
-                self.wire_net.set_data_path_state(self.transfer_path, False, current_time)
+                self.wire_net.set_data_path_state(
+                    self.transfer_path, False, self.communication_id, current_time
+                )
 
     def check_communication_ready(self):
         """
@@ -89,7 +95,7 @@ class BaseCommunication(Component):
         self.communication_end_time = current_time + transfer_time
         self.communication_range_time.append((current_time, self.communication_end_time))
         # set wire state, in schedule
-        self.wire_net.set_data_path_state(self.transfer_path, True, current_time)
+        self.wire_net.set_data_path_state(self.transfer_path, True, self.communication_id, current_time)
         return None
 
     def get_communication_end_time(self):
