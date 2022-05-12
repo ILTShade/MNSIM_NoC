@@ -24,6 +24,7 @@ class BaseWire(Component):
         self.band_width = band_width
         self.running_state = False
         self.transparent_flag = False
+        self.transfer_time_range = []
 
     def get_transfer_time(self, data_list):
         """
@@ -32,7 +33,7 @@ class BaseWire(Component):
         data_size = sum([get_data_size(data) for data in data_list])
         return data_size / self.band_width
 
-    def set_wire_state(self, wire_state):
+    def set_wire_state(self, wire_state, current_time):
         """
         set the wire state
         """
@@ -40,6 +41,13 @@ class BaseWire(Component):
             return None
         assert wire_state != self.running_state
         self.running_state = wire_state
+        if wire_state == True:
+            # add new range
+            self.transfer_time_range.append([current_time])
+        else:
+            # add end time
+            self.transfer_time_range[-1].append(current_time)
+        return None
 
     def get_wire_state(self):
         """

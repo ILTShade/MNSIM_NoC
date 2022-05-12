@@ -116,8 +116,7 @@ class BaseTile(Component):
         """
         if self.running_state:
             return self.computation_end_time
-        else:
-            return float("inf")
+        return float("inf")
 
     def get_computation_range(self):
         """

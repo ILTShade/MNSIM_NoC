@@ -38,6 +38,22 @@ class Mapping(Component):
         """
         raise NotImplementedError
 
+    def _check_position_list(self, position_list, tile_behavior_list):
+        """
+        check position list
+        the length of position list should be equal to the length of tile_list
+        all position should be tuple and inside the range of tile_net_shape
+        """
+        assert len(position_list) == len(tile_behavior_list), \
+            "the length of position list should be equal to the length of tile_list"
+        for position in position_list:
+            assert isinstance(position, tuple), \
+                "all position should be tuple"
+            assert len(position) == 2, \
+                "all position should be tuple with length 2"
+            assert 0 <= position[0] < self.tile_row and 0 <= position[1] < self.tile_column, \
+                "all position should be inside the range of tile_net_shape"
+
     def mapping_net(self):
         """
         mapping net
@@ -50,6 +66,7 @@ class Mapping(Component):
                 tile_behavior_list.append(tile_behavior)
         # get position
         position_list = self._get_position_list(tile_behavior_list)
+        self._check_position_list(position_list, tile_behavior_list)
         # get tile list
         tile_list = []
         for position, tile_behavior in zip(position_list, tile_behavior_list):
@@ -91,7 +108,6 @@ class Mapping(Component):
                     communication_in_ids.append(id(communication))
                     update_module.append(communication)
         return update_module
-
 
 class NaiveMapping(Mapping):
     """
