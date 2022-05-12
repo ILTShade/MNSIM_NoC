@@ -51,6 +51,7 @@ class WireNet(Component):
                 wire = BaseWire(wire_position, band_width)
                 self.wires.append(wire)
                 self.wires_map[_get_map_key(wire_position)] = wire
+        self.transparent_flag = False
 
     def set_transparent_flag(self, transparent_flag):
         """
@@ -58,16 +59,15 @@ class WireNet(Component):
         """
         for wire in self.wires:
             wire.set_transparent_flag(transparent_flag)
+        self.transparent_flag = transparent_flag
 
-    def get_all_wire_state(self):
+    def get_all_wire_state(self, all_wire_state, transfer_path_keys):
         """
-        get all wire state, with key and value
+        set all wire state, with key and value
         return dict with key and state
         """
-        all_wire_state = {}
-        for key, wire in self.wires_map.items():
-            all_wire_state[key] = wire.get_wire_state()
-        return all_wire_state
+        for transfer_path in transfer_path_keys:
+            all_wire_state[transfer_path] = self.wires_map[transfer_path].get_wire_state()
 
     def get_data_path_state(self, transfer_path):
         """

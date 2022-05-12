@@ -22,6 +22,7 @@ class Schedule(Component):
         super(Schedule, self).__init__()
         self.communication_list = communication_list
         self.wire_net = wire_net
+        self.all_wire_state = {}
 
     @abc.abstractmethod
     def _get_transfer_path_list(self, communication_ready_flag):
@@ -64,11 +65,16 @@ class NaiveSchedule(Schedule):
         # naive schedule
         transfer_path_list = []
         transfer_time_list = []
-        all_wire_state = self.wire_net.get_all_wire_state() # get all wire state
+        # get used wire state
         for i, ready_flag in enumerate(communication_ready_flag):
             if ready_flag:
                 transfer_path, transfer_path_str = self._get_naive_path(i)
-                if not any([all_wire_state[key] for key in transfer_path_str]):
+                self.wire_net.get_all_wire_state(self.all_wire_state, transfer_path_str)
+        # judge
+        for i, ready_flag in enumerate(communication_ready_flag):
+            if ready_flag:
+                transfer_path, transfer_path_str = self._get_naive_path(i)
+                if not any([self.all_wire_state[key] for key in transfer_path_str]):
                     # add transfer path to list
                     transfer_path_list.append(transfer_path)
                     # set transfer time
@@ -79,7 +85,7 @@ class NaiveSchedule(Schedule):
                     )
                     # update all wire state
                     for key in transfer_path_str:
-                        all_wire_state[key] = True
+                        self.all_wire_state[key] = not self.wire_net.transparent_flag
                     continue
             transfer_path_list.append(None)
             transfer_time_list.append(None)
