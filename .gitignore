@@ -126,3 +126,6 @@ results/
 
 # data and example
 datas/
+
+# bash
+*.sh
