@@ -41,6 +41,10 @@ class BaseCommunication(Component):
         # transfer data and path
         self.transfer_data = None
         self.transfer_path = None
+        # transfer rate
+        self.number_total_communication = self.input_tile.image_num * \
+            len(self.input_tile.tile_behavior_cfg["dependence"])
+        self.number_done_communication = 0
         # set communication id
         self.communication_id = \
             f"{input_tile.task_id},{input_tile.tile_id}"+\
@@ -61,6 +65,8 @@ class BaseCommunication(Component):
                 self.wire_net.set_data_path_state(
                     self.transfer_path, False, self.communication_id, current_time
                 )
+                # add number of done communication
+                self.number_done_communication += 1
 
     def check_communication_ready(self):
         """
@@ -95,7 +101,9 @@ class BaseCommunication(Component):
         self.communication_end_time = current_time + transfer_time
         self.communication_range_time.append((current_time, self.communication_end_time))
         # set wire state, in schedule
-        self.wire_net.set_data_path_state(self.transfer_path, True, self.communication_id, current_time)
+        self.wire_net.set_data_path_state(
+            self.transfer_path, True, self.communication_id, current_time
+        )
         return None
 
     def get_communication_end_time(self):
@@ -104,14 +112,19 @@ class BaseCommunication(Component):
         """
         if self.running_state:
             return self.communication_end_time
-        else:
-            return float("inf")
+        return float("inf")
 
     def get_communication_range(self):
         """
         get the range of the communication
         """
         return self.communication_range_time
+
+    def get_done_communication_rate(self):
+        """
+        get the done communication rate
+        """
+        return self.number_done_communication * 1. / self.number_total_communication
 
     def check_finish(self):
         """
@@ -120,6 +133,8 @@ class BaseCommunication(Component):
         assert self.running_state == False, "communication should be idle"
         assert self.communication_end_time == float("inf"), \
             "communication end time should be inf"
+        assert self.number_done_communication == self.number_total_communication, \
+            "number of done communication should be equal to total communication"
 
     def get_running_rate(self, end_time):
         """

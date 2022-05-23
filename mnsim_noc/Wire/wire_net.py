@@ -63,13 +63,17 @@ class WireNet(Component):
             wire.set_transparent_flag(transparent_flag)
         self.transparent_flag = transparent_flag
 
-    def get_all_wire_state(self, all_wire_state, transfer_path_keys):
+    def get_all_wire_state(self, all_wire_state, transfer_path_keys=None):
         """
         set all wire state, with key and value
         return dict with key and state
         """
-        for transfer_path in transfer_path_keys:
-            all_wire_state[transfer_path] = self.wires_map[transfer_path].get_wire_state()
+        if transfer_path_keys is not None:
+            for transfer_path in transfer_path_keys:
+                all_wire_state[transfer_path] = self.wires_map[transfer_path].get_wire_state()
+        else:
+            for key, value in self.wires_map.items():
+                all_wire_state[key] = value.get_wire_state()
 
     def get_data_path_state(self, transfer_path):
         """

@@ -150,13 +150,13 @@ class SnakeMapping(Mapping):
             position_list += line
         # return list
         return position_list[:len(tile_behavior_list)]
-    
+
 class CommunicationWiseMapping(Mapping):
     """
     Communication-Wise mapping, designed to minimize the total communication
     """
     NAME = "commwise"
-    
+
     def get_nearest_pos(self, pos, map_list):
         """
         get the nearest empty space
@@ -168,7 +168,7 @@ class CommunicationWiseMapping(Mapping):
             for loc in [(i+pos[0],distance-abs(i)+pos[1]) for i in range(-distance,distance)]+[(i+pos[0],abs(i)-distance+pos[1]) for i in range(distance,-distance,-1)]:
                 if 0<=loc[0]<self.tile_row and 0<=loc[1]<self.tile_column and map_list[loc[0]][loc[1]] == -1:
                     return loc
-    
+
     def get_best_point(self, position_list):
         """
         get the most open point
@@ -194,15 +194,15 @@ class CommunicationWiseMapping(Mapping):
                     loc = pos_tmp
                     wide = dis
         return loc
-    
+
     def _get_position_list(self, tile_behavior_list):
         """
         get position list
-        
+
         variables:
-            data_matrix: 
+            data_matrix:
                 total data size transferred from tile[i] -> tile[j]
-            rank_list: 
+            rank_list:
                 [((tile_id,target_tile_id),transfer_amount)]
             map_list:
                 mesh[i][j] is reserved for tile x

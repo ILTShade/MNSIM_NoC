@@ -62,46 +62,60 @@ class NaiveSchedule(Schedule):
         """
         get transfer path list
         """
-        # naive schedule
-        transfer_path_list = []
-        transfer_time_list = []
-        # get used wire state
-        for i, ready_flag in enumerate(communication_ready_flag):
-            if ready_flag:
-                transfer_path, transfer_path_str = self._get_naive_path(i)
-                self.wire_net.get_all_wire_state(self.all_wire_state, transfer_path_str)
-        # judge
-        for i, ready_flag in enumerate(communication_ready_flag):
-            if ready_flag:
-                transfer_path, transfer_path_str = self._get_naive_path(i)
-                if not any([self.all_wire_state[key] for key in transfer_path_str]):
-                    # add transfer path to list
-                    transfer_path_list.append(transfer_path)
-                    # set transfer time
-                    transfer_time_list.append(
-                        self.wire_net.get_wire_transfer_time(
-                            transfer_path, self.communication_list[i].transfer_data
-                        )
-                    )
-                    # update all wire state
-                    for key in transfer_path_str:
-                        self.all_wire_state[key] = not self.wire_net.transparent_flag
-                    continue
-            transfer_path_list.append(None)
-            transfer_time_list.append(None)
+        # naive schedule template
+        assert len(communication_ready_flag) == len(self.communication_list), \
+            "communication ready flag length is not equal to communication list length"
+        transfer_path_list = [None] * len(self.communication_list)
+        transfer_time_list = [None] * len(self.communication_list)
+        self.all_wire_state = {}
+        # get all wire state
+        self.wire_net.get_all_wire_state(self.all_wire_state)
+        # get sorted index and fused into communication ready flag
+        sorted_index = self._get_sorted_index()
+        sorted_index = list(filter(lambda x: communication_ready_flag[x], sorted_index))
+        # JUDGE
+        for index in sorted_index:
+            path_flag, transfer_path, transfer_path_str = self._find_check_path(index)
+            if path_flag:
+                # add transfer path to list
+                transfer_path_list[index] = transfer_path
+                # set transfer time
+                transfer_time_list[index] = self.wire_net.get_wire_transfer_time(
+                    transfer_path, self.communication_list[index].transfer_data
+                )
+                # update all wire state
+                for key in transfer_path_str:
+                    self.all_wire_state[key] = not self.wire_net.transparent_flag
         return transfer_path_list, transfer_time_list
 
-    def _get_naive_path(self, i):
+    def _get_sorted_index(self):
+        """
+        get sorted index based on the priority
+        for the dynamic priority, naive is the default index
+        """
+        return list(range(len(self.communication_list)))
+
+    def _find_check_path(self, communication_id):
+        """
+        find and check if there is a path for communication id
+        return, path_flag, path, path_str
+        """
+        transfer_path, transfer_path_str = self._get_naive_path(communication_id)
+        # check if the path is avaliable
+        path_flag = not any([self.all_wire_state[key] for key in transfer_path_str])
+        return path_flag, transfer_path, transfer_path_str
+
+    def _get_naive_path(self, communication_id):
         """
         get naive path
         """
         # use cache path
-        if str(i) in self.path_cache:
-            return self.path_cache[str(i)]
+        if str(communication_id) in self.path_cache:
+            return self.path_cache[str(communication_id)]
         # ge path
-        start_position = self.communication_list[i].input_tile.position
-        end_position = self.communication_list[i].output_tile.position
-        assert start_position != end_position
+        start_position = self.communication_list[communication_id].input_tile.position
+        end_position = self.communication_list[communication_id].output_tile.position
+        assert start_position != end_position, "start position and end position are the same"
         current_position = [start_position[0], start_position[1]]
         path = []
         while True:
@@ -115,8 +129,25 @@ class NaiveSchedule(Schedule):
                 break
         navie_path = [(path[i], path[i+1]) for i in range(len(path)-1)] # get wire
         navie_path_str = [_get_map_key(path) for path in navie_path] # get map key
-        self.path_cache[str(i)] = (navie_path, navie_path_str) # cache path
-        return self.path_cache[str(i)]
+        self.path_cache[str(communication_id)] = (navie_path, navie_path_str) # cache path
+        return self.path_cache[str(communication_id)]
+
+class DynamicPrioritySchedule(NaiveSchedule):
+    """
+    dynamic priority schedule
+    """
+    NAME = "naive_dynamic_priority"
+    def _get_sorted_index(self):
+        """
+        get sorted index based on the communication rate
+        """
+        done_rate_list = [
+            (self.communication_list[i].get_done_communication_rate(), i)
+            for i in range(len(self.communication_list))
+        ]
+        sorted_done_rate_list = sorted(done_rate_list, key=lambda x: x[0], reverse=False)
+        sorted_index = [i[1] for i in sorted_done_rate_list]
+        return sorted_index
 
 class ParallelSchedule(NaiveSchedule):
     """
