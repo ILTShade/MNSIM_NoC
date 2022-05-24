@@ -11,7 +11,7 @@
 """
 import abc
 from mnsim_noc.utils.component import Component
-from mnsim_noc.Wire.wire_net import _get_map_key
+from mnsim_noc.Wire.wire_net import _get_map_key, _get_position_key
 
 class Schedule(Component):
     """
@@ -22,12 +22,13 @@ class Schedule(Component):
         super(Schedule, self).__init__()
         self.communication_list = communication_list
         self.wire_net = wire_net
-        self.all_wire_state = {}
 
     @abc.abstractmethod
-    def _get_transfer_path_list(self, communication_ready_flag):
+    def _get_transfer_path_list(self, communication_ready_flag, current_time):
         """
         get transfer path list, and transfer time list
+        start communication in this method
+        NO global optimization ,since there is priority
         """
         raise NotImplementedError
 
@@ -39,12 +40,8 @@ class Schedule(Component):
         communication_ready_flag = [communication.check_communication_ready()
             for communication in self.communication_list
         ]
-        transfer_path_list, transfer_time_list = \
-            self._get_transfer_path_list(communication_ready_flag)
-        # set task
-        for transfer_path, transfer_time, communication in \
-            zip(transfer_path_list, transfer_time_list, self.communication_list):
-            communication.set_communication_task(current_time, transfer_path, transfer_time)
+        # schedule and start communication
+        self._get_transfer_path_list(communication_ready_flag, current_time)
 
 class NaiveSchedule(Schedule):
     """
@@ -58,7 +55,7 @@ class NaiveSchedule(Schedule):
         super(NaiveSchedule, self).__init__(communication_list, wire_net)
         self.path_cache = {} # cache the communication path
 
-    def _get_transfer_path_list(self, communication_ready_flag):
+    def _get_transfer_path_list(self, communication_ready_flag, current_time):
         """
         get transfer path list
         """
@@ -67,15 +64,13 @@ class NaiveSchedule(Schedule):
             "communication ready flag length is not equal to communication list length"
         transfer_path_list = [None] * len(self.communication_list)
         transfer_time_list = [None] * len(self.communication_list)
-        self.all_wire_state = {}
-        # get all wire state
-        self.wire_net.get_all_wire_state(self.all_wire_state)
+        # based on the priority, no all wire state
         # get sorted index and fused into communication ready flag
         sorted_index = self._get_sorted_index()
         sorted_index = list(filter(lambda x: communication_ready_flag[x], sorted_index))
         # JUDGE
         for index in sorted_index:
-            path_flag, transfer_path, transfer_path_str = self._find_check_path(index)
+            path_flag, transfer_path = self._find_check_path(index)
             if path_flag:
                 # add transfer path to list
                 transfer_path_list[index] = transfer_path
@@ -83,10 +78,10 @@ class NaiveSchedule(Schedule):
                 transfer_time_list[index] = self.wire_net.get_wire_transfer_time(
                     transfer_path, self.communication_list[index].transfer_data
                 )
-                # update all wire state
-                for key in transfer_path_str:
-                    self.all_wire_state[key] = not self.wire_net.transparent_flag
-        return transfer_path_list, transfer_time_list
+                # start task
+                self.communication_list[index].set_communication_task(
+                    current_time, transfer_path_list[index], transfer_time_list[index]
+                )
 
     def _get_sorted_index(self):
         """
@@ -100,10 +95,10 @@ class NaiveSchedule(Schedule):
         find and check if there is a path for communication id
         return, path_flag, path, path_str
         """
-        transfer_path, transfer_path_str = self._get_naive_path(communication_id)
+        transfer_path = self._get_naive_path(communication_id)
         # check if the path is avaliable
-        path_flag = not any([self.all_wire_state[key] for key in transfer_path_str])
-        return path_flag, transfer_path, transfer_path_str
+        path_flag = not self.wire_net.get_data_path_state(transfer_path)
+        return path_flag, transfer_path
 
     def _get_naive_path(self, communication_id):
         """
@@ -128,8 +123,8 @@ class NaiveSchedule(Schedule):
             else:
                 break
         navie_path = [(path[i], path[i+1]) for i in range(len(path)-1)] # get wire
-        navie_path_str = [_get_map_key(path) for path in navie_path] # get map key
-        self.path_cache[str(communication_id)] = (navie_path, navie_path_str) # cache path
+        # navie_path_str = [_get_map_key(path) for path in navie_path] # get map key
+        self.path_cache[str(communication_id)] = navie_path # cache path
         return self.path_cache[str(communication_id)]
 
 class DynamicPrioritySchedule(NaiveSchedule):
@@ -149,90 +144,79 @@ class DynamicPrioritySchedule(NaiveSchedule):
         sorted_index = [i[1] for i in sorted_done_rate_list]
         return sorted_index
 
-class ParallelSchedule(NaiveSchedule):
+class DynamicPathSchedule(NaiveSchedule):
     """
-    parallel schedule:
-    use all wire inside the rectangle to transfer data
-    suppose m is bigger than n
-        then origin time is m + n
-        and the parallel schedule time is (1+1/2+...+1/n)+(m-n)/(2*n+1)
+    dynamic path
+    the communication path is not fixed, find the optimal design
     """
-    NAME = "parallel"
-    def __init__(self, communication_list, wire_net):
+    NAME = "naive_dynamic_path"
+    def _find_check_path(self, communication_id):
         """
-        initialize the schedule with additional parallel cache
+        find and check if there is a dynamic path for communication id
         """
-        super(ParallelSchedule, self).__init__(communication_list, wire_net)
-        self.parallel_path_cache = {} # cache the parallel communication path
+        # get start and end
+        start_position = self.communication_list[communication_id].input_tile.position
+        end_position = self.communication_list[communication_id].output_tile.position
+        assert start_position != end_position, "start position and end position are the same"
+        start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
+        path_flag = False
+        # init all node info list, and the first start node
+        all_node_info = {}
+        for node, _ in self.wire_net.adjacency_dict.items():
+            # the first item in list is distance from start_node, the second is the hops
+            all_node_info[node] = [None, None]
+        all_node_info[start_node][0] = 0
+        # traverse the graph
+        add_node_list = [start_node]
+        while True:
+            # TODO: perhaps limit the length
+            next_node_list = []
+            # get the next hops node
+            for node in add_node_list:
+                adjacency_node_list = self.wire_net.adjacency_dict[node]
+                for adjacency_node in adjacency_node_list:
+                    if all_node_info[adjacency_node][0] is not None:
+                        continue
+                    # add to next node list
+                    all_node_info[adjacency_node] = [all_node_info[node][0] + 1, node]
+                    next_node_list.append(adjacency_node)
+            # check for output
+            if end_node in next_node_list:
+                # find end node, break
+                path_flag = True
+                break
+            if len(next_node_list) == 0:
+                # no new node, break
+                path_flag = False
+                break
+            add_node_list = next_node_list
+        # get path if path is found
+        if path_flag:
+            # get total path
+            path = []
+            current = end_node
+            while True:
+                path.append(self.wire_net.mapping_dict[current])
+                if current == start_node:
+                    break
+                current = all_node_info[current][1]
+            dynamic_path = [(path[i], path[i+1]) for i in range(len(path)-1)] # get wire
+            return True, dynamic_path
+        return False, None
 
-    def _get_transfer_path_list(self, communication_ready_flag):
+class DynamicAllSchedule(DynamicPrioritySchedule, DynamicPathSchedule):
+    """
+    dynamic priority and dynamic path both
+    """
+    NAME = "naive_dynamic_all"
+    def _get_sorted_index(self):
         """
-        get transfer path list
+        get sorted index based on the communication rate
         """
-        # naive schedule
-        transfer_path_list = []
-        transfer_time_list = []
-        # get used wire state
-        for i, ready_flag in enumerate(communication_ready_flag):
-            if ready_flag:
-                transfer_path, transfer_path_str, _ = self._get_parallel_path(i)
-                self.wire_net.get_all_wire_state(self.all_wire_state, transfer_path_str)
-        # judge
-        for i, ready_flag in enumerate(communication_ready_flag):
-            if ready_flag:
-                naive_transfer_path, _ = self._get_naive_path(i)
-                transfer_path, transfer_path_str, scale = self._get_parallel_path(i)
-                if not any([self.all_wire_state[key] for key in transfer_path_str]):
-                    # add transfer path to list
-                    transfer_path_list.append(transfer_path)
-                    # set transfer time
-                    transfer_time_list.append(
-                        scale * self.wire_net.get_wire_transfer_time(
-                            naive_transfer_path, self.communication_list[i].transfer_data
-                        )
-                    )
-                    # update all wire state
-                    for key in transfer_path_str:
-                        self.all_wire_state[key] = not self.wire_net.transparent_flag
-                    continue
-            transfer_path_list.append(None)
-            transfer_time_list.append(None)
-        return transfer_path_list, transfer_time_list
+        return DynamicPrioritySchedule._get_sorted_index(self)
 
-    def _get_parallel_path(self, comm_id):
+    def _find_check_path(self, communication_id):
         """
-        get parallel path
+        find and check if there is a path for communication id
         """
-        # use cache path
-        if str(comm_id) in self.parallel_path_cache:
-            return self.parallel_path_cache[str(comm_id)]
-        # get parallel path
-        start_position = self.communication_list[comm_id].input_tile.position
-        end_position = self.communication_list[comm_id].output_tile.position
-        assert start_position != end_position, \
-            f"start position {start_position} is equal to end position {end_position}"
-        # get minx, miny, maxx, maxy
-        minx, maxx = \
-            min(start_position[0], end_position[0]), max(start_position[0], end_position[0])
-        miny, maxy = \
-            min(start_position[1], end_position[1]), max(start_position[1], end_position[1])
-        # get all wire inside the rectangle
-        parallel_path = []
-        for i in range(minx, maxx+1):
-            for j in range(miny, maxy):
-                parallel_path.append(((i,j),(i,j+1)))
-        for i in range(minx, maxx):
-            for j in range(miny, maxy+1):
-                parallel_path.append(((i,j),(i+1,j)))
-        # get map key
-        parallel_path_str = [_get_map_key(path) for path in parallel_path]
-        # get scale
-        m = max(maxx-minx, maxy-miny)
-        n = min(maxx-minx, maxy-miny)
-        if n == 0:
-            scale = 1
-        else:
-            s = sum([1/i for i in range(1, n+1)])
-            scale = (s + (m-n)/(2*n+1))/(m+n)
-        self.parallel_path_cache[str(comm_id)] = (parallel_path, parallel_path_str, scale)
-        return self.parallel_path_cache[str(comm_id)]
+        return DynamicPathSchedule._find_check_path(self, communication_id)

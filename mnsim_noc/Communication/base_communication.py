@@ -72,7 +72,7 @@ class BaseCommunication(Component):
         """
         check if this communication can transfer data
         """
-        # TODO: there may be larger for the tile input buffer
+        # there may be larger for the tile input buffer
         if self.running_state:
             return False
         # PHASE COMMUNICATION JUDGE
@@ -86,10 +86,7 @@ class BaseCommunication(Component):
         """
         transfer path can be None, means no communication
         """
-        if trasnfer_path is None:
-            if self.running_state == False:
-                self.communication_end_time = float("inf")
-            return None
+        assert trasnfer_path is not None
         assert not self.running_state, f"communication should be idle"
         # PHASE COMMUNICATION START
         self.running_state = True
@@ -104,7 +101,6 @@ class BaseCommunication(Component):
         self.wire_net.set_data_path_state(
             self.transfer_path, True, self.communication_id, current_time
         )
-        return None
 
     def get_communication_end_time(self):
         """
@@ -131,7 +127,7 @@ class BaseCommunication(Component):
         check if the communication is finish
         """
         assert self.running_state == False, "communication should be idle"
-        assert self.communication_end_time == float("inf"), \
+        assert self.get_communication_end_time() == float("inf"), \
             "communication end time should be inf"
         assert self.number_done_communication == self.number_total_communication, \
             "number of done communication should be equal to total communication"
