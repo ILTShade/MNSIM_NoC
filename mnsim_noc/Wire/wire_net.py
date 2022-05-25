@@ -9,6 +9,7 @@
 @CreateTime:
     2022/05/07 17:20
 """
+import copy
 import numpy as np
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Wire.base_wire import BaseWire
@@ -48,8 +49,10 @@ class WireNet(Component):
         # wires topology and adjacency dict
         self.wires_topology = []
         self.adjacency_dict = {}
+        self.origin_adjacency_dict = {} # the base adjacency dict, will NOT change
         self.mapping_dict = {}
-        # horizontally wire
+        self.cache_static_path = {}
+        # horizontally wire as usual
         for i in range(tile_net_shape[0]):
             for j in range(tile_net_shape[1] - 1):
                 wire_position = ((i, j), (i, j + 1))
@@ -57,7 +60,7 @@ class WireNet(Component):
                 self.wires.append(wire)
                 self.wires_map[_get_map_key(wire_position)] = wire
                 self.wires_topology.append(wire_position)
-        # vertically wire
+        # vertically wire as usual
         for j in range(tile_net_shape[1]):
             for i in range(tile_net_shape[0] - 1):
                 wire_position = ((i, j), (i + 1, j))
@@ -67,6 +70,8 @@ class WireNet(Component):
                 self.wires_topology.append(wire_position)
         self.transparent_flag = False
         # init adjacency dict
+        # IT SHOULD BE NOTICED THAT
+        # all path are defined based on the wires_topology
         self._init_adjacency_dict(self.wires_topology)
 
     def _init_adjacency_dict(self, wires_topology):
@@ -88,8 +93,14 @@ class WireNet(Component):
             # add node a and node b to mapping
             if node_a not in self.mapping_dict:
                 self.mapping_dict[node_a] = wire_position[0]
+            else:
+                assert self.mapping_dict[node_a] == wire_position[0]
             if node_b not in self.mapping_dict:
                 self.mapping_dict[node_b] = wire_position[1]
+            else:
+                assert self.mapping_dict[node_b] == wire_position[1]
+        # init origin adjacency dict
+        self.origin_adjacency_dict = copy.deepcopy(self.adjacency_dict)
 
     def _update_adjacency_dict(self, wire:BaseWire, state):
         """
@@ -109,6 +120,76 @@ class WireNet(Component):
             self.adjacency_dict[node_a].append(node_b)
             self.adjacency_dict[node_b].append(node_a)
         return None
+
+    def find_data_path(self, start_position, end_position, dynamic_flag):
+        """
+        find the data path from start_position to end_position
+        start_position: tuple -> (row_index, column_index)
+        end_position: tuple -> (row_index, column_index)
+        dynamic_flag: bool -> for static path or dynamic path
+        """
+        # for dynamic and static, the adjacency dict is different
+        if dynamic_flag is True:
+            this_adjacency_dict = self.adjacency_dict
+        else:
+            # check for cache
+            cache_key = _get_map_key((start_position, end_position))
+            if cache_key in self.cache_static_path:
+                return self.cache_static_path[cache_key]
+            this_adjacency_dict = self.origin_adjacency_dict
+        # init the start node and end node
+        start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
+        # init all node info list, and add the first start node
+        all_node_info = {}
+        for node, _ in this_adjacency_dict.items():
+            # the first item in list is distance from start_node, None for not reach
+            # the second is the previous node
+            all_node_info[node] = [None, None]
+        assert start_node in all_node_info and end_node in all_node_info, \
+            f"start_node and end_node should be in all_node_info"
+        all_node_info[start_node][0] = 0
+        # traverse the graph
+        add_node_list = [start_node]
+        path_flag = False
+        while True:
+            next_node_list = []
+            # get the next hops node
+            for node in add_node_list:
+                adjacency_node_list = this_adjacency_dict[node]
+                for adjacency_node in adjacency_node_list:
+                    if all_node_info[adjacency_node][0] is not None:
+                        continue
+                    # add to next node list
+                    all_node_info[adjacency_node] = [all_node_info[node][0] + 1, node]
+                    next_node_list.append(adjacency_node)
+            # check for output
+            if end_node in next_node_list:
+                # find end node, break
+                path_flag = True
+                break
+            if len(next_node_list) == 0:
+                # no new node, break
+                path_flag = False
+                break
+            add_node_list = next_node_list
+        # get path if path is found
+        output_path = None
+        if path_flag is True:
+            # get total path
+            path = []
+            current_node = end_node
+            while True:
+                path.append(self.mapping_dict[current_node])
+                if current_node == start_node:
+                    break
+                current_node = all_node_info[current_node][1]
+            output_path = [(path[i], path[i+1]) for i in range(len(path)-1)] # get wire path
+        # for dynamic and static, the output is different
+        if dynamic_flag is True:
+            return output_path
+        assert output_path is not None, f"output_path should not be None"
+        self.cache_static_path[cache_key] = output_path
+        return self.cache_static_path[cache_key]
 
     def set_transparent_flag(self, transparent_flag):
         """

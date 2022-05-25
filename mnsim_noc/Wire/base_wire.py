@@ -38,7 +38,7 @@ class BaseWire(Component):
         set the wire state
         """
         # add the transfer time range
-        if communication_id not in self.transfer_time_range.keys():
+        if communication_id not in self.transfer_time_range:
             self.transfer_time_range[communication_id] = []
         if wire_state == True:
             # add new range
