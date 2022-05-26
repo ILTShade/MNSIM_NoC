@@ -10,6 +10,7 @@
     2022/05/07 21:20
 """
 import abc
+import math
 from mnsim_noc.utils.component import Component
 
 class Schedule(Component):
@@ -21,6 +22,12 @@ class Schedule(Component):
         super(Schedule, self).__init__()
         self.communication_list = communication_list
         self.wire_net = wire_net
+        # init hyper parameter
+        self.max_len_ratio = 1.8
+        self.branch_preset = 2
+        self.logger.info(
+            f"The ratio is {self.max_len_ratio}, and the branch preset is {self.branch_preset}"
+        )
 
     @abc.abstractmethod
     def _get_transfer_path_list(self, communication_ready_flag, current_time):
@@ -128,6 +135,16 @@ class DynamicPathSchedule(NaiveSchedule):
         end_position = self.communication_list[communication_id].output_tile.position
         assert start_position != end_position, "start position and end position are the same"
         transfer_path = self.wire_net.find_data_path(start_position, end_position, True)
+        # check the transfer path length
+        if transfer_path is None:
+            return False, None
+        naive_path = self.wire_net.find_data_path(start_position, end_position, False)
+        max_path_len = math.floor(max(
+            self.max_len_ratio * len(naive_path), # ratio for time
+            len(naive_path) + self.branch_preset # branch for start node and end node
+        ))
+        transfer_path = transfer_path if len(transfer_path) <= max_path_len else None
+        # return the output
         return transfer_path is not None, transfer_path
 
 class DynamicAllSchedule(DynamicPrioritySchedule, DynamicPathSchedule):
