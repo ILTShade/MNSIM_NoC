@@ -93,7 +93,7 @@ class Candidate(Component):
                     abs(position_i[1] - position_j[1])
                 # count
                 total_count += self.adjacency_matrix[i, j] * distance
-        return total_count
+        return float(total_count)
 
     @classmethod
     def crossover(cls, candidate_a, candidate_b):

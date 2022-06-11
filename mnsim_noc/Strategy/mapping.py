@@ -11,14 +11,14 @@
 """
 import abc
 import copy
-from hashlib import new
 import random
+import numpy as np
+from mnsim_noc.Buffer.base_buffer import get_data_size
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Tile import BaseTile
 from mnsim_noc.Wire import WireNet
 from mnsim_noc.Communication import BaseCommunication
-from numpy import sort
-from torch import rand
+from mnsim_noc.Strategy.heuristic_algorithm import Candidate
 
 class Mapping(Component):
     """
@@ -35,6 +35,36 @@ class Mapping(Component):
         self.tile_column = tile_net_shape[1]
         self.buffer_size = buffer_size
         self.band_width = band_width
+
+    def get_adjacency_matrix(self, tile_behavior_list):
+        """
+        get adjacency matrix
+        """
+        # get and set the adjacency matrix
+        task_tile_num = len(tile_behavior_list)
+        adjacency_matrix = np.zeros(
+            shape=(task_tile_num, task_tile_num),
+            dtype=np.int64
+        )
+        for i in range(task_tile_num):
+            for j in range(task_tile_num):
+                if i == j:
+                    continue
+                # task id must be the same
+                if tile_behavior_list[i]["task_id"] != tile_behavior_list[j]["task_id"]:
+                    continue
+                # j in the target tile id
+                if tile_behavior_list[j]["tile_id"] not in \
+                    tile_behavior_list[i]["target_tile_id"]:
+                    continue
+                # calculate the communication amount
+                transfer_amount = sum([
+                    get_data_size(v["output"][0])
+                    for v in tile_behavior_list[i]["dependence"]
+                ])
+                adjacency_matrix[i][j] = transfer_amount
+                adjacency_matrix[j][i] = transfer_amount
+        return task_tile_num, adjacency_matrix
 
     @abc.abstractmethod
     def _get_position_list(self, tile_behavior_list):
@@ -155,13 +185,13 @@ class SnakeMapping(Mapping):
             position_list += line
         # return list
         return position_list[:len(tile_behavior_list)]
-    
+
 class CommunicationWiseMapping(Mapping):
     """
     Communication-Wise mapping, designed to minimize the total communication
     """
     NAME = "commwise"
-    
+
     def get_nearest_pos(self, pos, map_list):
         """
         get the nearest empty space
@@ -173,7 +203,7 @@ class CommunicationWiseMapping(Mapping):
             for loc in [(i+pos[0],distance-abs(i)+pos[1]) for i in range(-distance,distance)]+[(i+pos[0],abs(i)-distance+pos[1]) for i in range(distance,-distance,-1)]:
                 if 0<=loc[0]<self.tile_row and 0<=loc[1]<self.tile_column and map_list[loc[0]][loc[1]] == -1:
                     return loc
-    
+
     def get_best_point(self, position_list):
         """
         get the most open point
@@ -199,15 +229,15 @@ class CommunicationWiseMapping(Mapping):
                     loc = pos_tmp
                     wide = dis
         return loc
-    
+
     def _get_position_list(self, tile_behavior_list):
         """
         get position list
-        
+
         variables:
-            data_matrix: 
+            data_matrix:
                 total data size transferred from tile[i] -> tile[j]
-            rank_list: 
+            rank_list:
                 [((tile_id,target_tile_id),transfer_amount)]
             map_list:
                 mesh[i][j] is reserved for tile x
@@ -264,8 +294,58 @@ class CommunicationWiseMapping(Mapping):
                     map_list[loc_2[0]][loc_2[1]] = tile_2
         return position_list
 
+class HeuristicMapping(Mapping):
+    """
+    heuristic mapping based on heuristic candidate
+    """
+    NAME = "heuristic_baseline"
+    def _get_position_list(self, tile_behavior_list):
+        """
+        get position list as heuristic baseline
+        """
+        # get task tile number and adjacency matrix
+        task_tile_num, adjacency_matrix = self.get_adjacency_matrix(tile_behavior_list)
+        # heuristic search, init parameters
+        N = 200
+        max_generation = 100
+        # 1, init the population, with N possible candidate
+        population = [
+            Candidate(self.tile_row, self.tile_column, task_tile_num, adjacency_matrix)
+            for _ in range(N)
+        ]
+        # 2, mutation, crossover, and filter, for max_generation epoch
+        for _ in range(max_generation):
+            # 2.1, mutation for all
+            mutation_population = [candidate.mutation() for candidate in population]
+            # 2.2, crossover, based on the fitness ad the probability
+            probability = np.array([1./candidate.fitness for candidate in population])
+            probability = probability / probability.sum()
+            crossover_pair = np.random.choice(
+                list(range(len(population))),
+                size=(len(population), 2),
+                p=probability
+            ).tolist()
+            crossover_population = [
+                Candidate.crossover(population[pair[0]], population[pair[1]])
+                for pair in crossover_pair
+            ]
+            # 2.3, filter the population
+            population = population + mutation_population + crossover_population
+            population = sorted(
+                population,
+                key=lambda candidate: candidate.fitness
+            )
+            population = population[:N]
+            # log info
+            self.logger.info(f"Iteration {_}, the best amount is {population[0].fitness}")
+        # output the best candidate
+        return population[0].position_list
+
 # class for individuals and its behaviour
 class Individual:
+    """
+    individual class
+    """
     def __init__(self, tile_row, tile_column, tile_num, rank_list):
         self.tile_row = tile_row
         self.tile_column = tile_column
@@ -297,6 +377,9 @@ class Individual:
         return loc
     # rendom initialize
     def random_mapping(self):
+        """
+        mapping
+        """
         for link in self.rank_list:
             tile_1 = link[0][0]
             tile_2 = link[0][1]
