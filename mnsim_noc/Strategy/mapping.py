@@ -10,6 +10,7 @@
     2022/05/07 20:43
 """
 import abc
+import random
 import numpy as np
 from mnsim_noc.Buffer.base_buffer import get_data_size
 from mnsim_noc.utils.component import Component
@@ -213,7 +214,7 @@ class HeuristicMapping(Mapping):
             Candidate(self.tile_row, self.tile_column, task_tile_num, adjacency_matrix)
             for _ in range(N)
         ]
-        output_position_list = []
+        # output_position_list = []
         # 2, mutation, crossover, and filter, for max_generation epoch
         for _ in range(max_generation):
             # 2.1, mutation for all
@@ -239,11 +240,13 @@ class HeuristicMapping(Mapping):
             population = population[:N]
             # log info
             # self.logger.info(f"Iteration {_}, the best amount is {population[0].fitness}")
-            choice_index = 0
-            output_position_list.append((
-                population[choice_index].fitness,
-                population[choice_index].position_list,
-            ))
+            # choice_index = 0
+            # choice_index = random.randint(0, len(population)-1)
+            # output_position_list.append((
+                # population[choice_index].fitness,
+                # population[choice_index].position_list,
+            # ))
         # output the best candidate
         # return population[0].position_list
-        return output_position_list
+        # output all of the candidate
+        return [(cand.fitness, cand.position_list) for cand in population]
