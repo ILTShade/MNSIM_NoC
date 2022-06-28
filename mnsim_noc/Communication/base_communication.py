@@ -112,6 +112,12 @@ class BaseCommunication(Component):
         get the range of the communication
         """
         return self.communication_range_time
+    
+    def get_path(self):
+        """
+        
+        """
+        return self.transfer_path
 
     def check_finish(self):
         """
@@ -130,3 +136,16 @@ class BaseCommunication(Component):
             end - start for start, end in self.communication_range_time
         ])
         return communication_time * 1. / end_time
+
+    def get_communication_amount(self):
+        """
+        get the communication amount
+        """
+        tile_cfg = self.input_tile.tile_behavior_cfg
+        transfer_list = tile_cfg["dependence"]
+        transfer_amount = 0
+        for data in transfer_list:
+            outputs = data["output"]
+            for output in outputs:
+                transfer_amount += (output[3] - output[2]) * output[4]
+        return transfer_amount
