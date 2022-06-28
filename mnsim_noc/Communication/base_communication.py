@@ -12,6 +12,7 @@
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Tile import BaseTile
 from mnsim_noc.Wire import WireNet
+from mnsim_noc.Buffer.base_buffer import get_data_size
 
 class BaseCommunication(Component):
     """
@@ -76,26 +77,28 @@ class BaseCommunication(Component):
             return True
         return False
 
-    def set_communication_task(self, current_time, trasnfer_path, transfer_time):
+    def set_communication_task(self, current_time, transfer_path, transfer_time):
         """
         transfer path can be None, means no communication
         """
-        if trasnfer_path is None:
+        if transfer_path is None:
             if self.running_state == False:
                 self.communication_end_time = float("inf")
             return None
         assert not self.running_state, f"communication should be idle"
         # PHASE COMMUNICATION START
         self.running_state = True
-        self.transfer_path = trasnfer_path
+        self.transfer_path = transfer_path
         # set buffer
         self.input_buffer.add_transfer_data_list(self.transfer_data, self.source_tile_id)
         self.output_buffer.delete_data_list(self.transfer_data, self.target_tile_id)
-        # get transfet time
+        # get transfer time
         self.communication_end_time = current_time + transfer_time
         self.communication_range_time.append((current_time, self.communication_end_time))
         # set wire state, in schedule
-        self.wire_net.set_data_path_state(self.transfer_path, True, self.communication_id, current_time)
+        self.wire_net.set_data_path_state(
+            self.transfer_path, True, self.communication_id, current_time
+        )
         return None
 
     def get_communication_end_time(self):
@@ -112,11 +115,12 @@ class BaseCommunication(Component):
         get the range of the communication
         """
         return self.communication_range_time
-    
+
     def get_path(self):
         """
-        
+        get the last path of the communication
         """
+        assert self.transfer_path is not None, "transfer path should not be None"
         return self.transfer_path
 
     def check_finish(self):
@@ -147,5 +151,5 @@ class BaseCommunication(Component):
         for data in transfer_list:
             outputs = data["output"]
             for output in outputs:
-                transfer_amount += (output[3] - output[2]) * output[4]
+                transfer_amount += get_data_size(output)
         return transfer_amount

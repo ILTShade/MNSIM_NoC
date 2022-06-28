@@ -101,8 +101,8 @@ class Mapping(Component):
                 tile_behavior_list.append(tile_behavior)
         # get position, output pair list, fitness and position list
         output_pair_list = self._get_position_list(tile_behavior_list)
+        output_pair_list = output_pair_list + copy.deepcopy(output_pair_list)
         output_behavior_list = []
-        output_behavior_list_cp = []
         for output_pair in output_pair_list:
             fitness, position_list = output_pair
             self._check_position_list(position_list, tile_behavior_list)
@@ -126,11 +126,11 @@ class Mapping(Component):
             output_behavior_list.append((
                 fitness, tile_list, communication_list, wire_net
             ))
-            output_behavior_list_cp.append((
-                copy.deepcopy(fitness), copy.deepcopy(tile_list), copy.deepcopy(communication_list), copy.deepcopy(wire_net)
-            ))
+        L = len(output_behavior_list) // 2
+        output_behavior_list_cp = output_behavior_list[L:]
+        output_behavior_list = output_behavior_list[:L]
         # return tile_list, communication_list, wire_net
-        return [output_behavior_list, output_behavior_list_cp]
+        return (output_behavior_list, output_behavior_list_cp)
 
     def get_update_order(self, tile_list, communication_list):
         """

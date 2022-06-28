@@ -7,11 +7,11 @@
 @CreateTime:
     2021/10/08 18:21
 """
+import pandas as pd
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
 from mnsim_noc.Wire.wire_net import _get_map_key
-import pandas as pd
 
 
 class BaseArray(Component):
@@ -35,7 +35,7 @@ class BaseArray(Component):
         self.logger.info(f"\tThe buffer size is {buffer_size}")
         self.logger.info(f"\tThe band width is {band_width}")
         self.logger.info(
-            f"\tStartegy are {mapping_strategy}, {schedule_strategy}, {transparent_flag}"
+            f"\tStrategy are {mapping_strategy}, {schedule_strategy}, {transparent_flag}"
         )
         # show the array
         self._get_behavior_number(task_behavior_list)
@@ -45,8 +45,9 @@ class BaseArray(Component):
         )
         # self.tile_list, self.communication_list, self.wire_net = \
         # self.mapping_strategy.mapping_net()
-        self.output_behavior_list = self.mapping_strategy.mapping_net()[0]
-        self.output_behavior_list_cp = self.mapping_strategy.mapping_net()[1]
+        # self.output_behavior_list = self.mapping_strategy.mapping_net()[0]
+        # self.output_behavior_list_cp = self.mapping_strategy.mapping_net()[1]
+        self.output_behavior_list, self.output_behavior_list_cp = self.mapping_strategy.mapping_net()
         # set transparent
         self.transparent_flag = transparent_flag
         self.schedule_strategy = schedule_strategy
@@ -57,10 +58,11 @@ class BaseArray(Component):
         # time point list
         self.image_num = image_num
         self.tile_net_shape = tile_net_shape
-        
+
         # record the latency
         self.latency_list = []
-        # record the effecitive communication amount
+        # record the equivalent communication amount
+        self.r_communication_list = []
         self.e_communication_list = []
 
     def _get_behavior_number(self, task_behavior_list):
@@ -97,6 +99,96 @@ class BaseArray(Component):
                 f" {behavior_number[i]} behaviors"
             )
 
+    def run_single(self, tile_list, communication_list, wire_net):
+        """
+        run the simulation for single pass
+        """
+        schedule_strategy = Schedule.get_class_(self.schedule_strategy)(
+            communication_list, wire_net
+        )
+        # init current time and time point list
+        current_time = 0.
+        time_point_list = []
+        update_module = self.mapping_strategy.get_update_order(
+            tile_list, communication_list
+        )
+        while True:
+            # running the data
+            for module in update_module:
+                module.update(current_time)
+            # schedule for the path
+            schedule_strategy.schedule(current_time)
+            # get next time
+            next_time = min([
+                min([tile.get_computation_end_time() for tile in tile_list]),
+                min([
+                    communication.get_communication_end_time()
+                    for communication in communication_list
+                ])
+            ])
+            # check if the simulation is over
+            assert next_time > current_time
+            current_time = next_time
+            if current_time == float("inf"):
+                break
+            time_point_list.append(current_time)
+        # check if the simulation is over
+        self.check_finish(tile_list, communication_list, wire_net)
+        return time_point_list
+
+    def _get_e_communication(self, communication_list):
+        """
+        get the equivalent communication amount
+        """
+        # compute the equivalent communication amount
+        occupy_list = []
+        amount_list = []
+        path_list = []
+        for communication in communication_list:
+            occupy_list.append(communication.get_communication_range())
+            amount_list.append(communication.get_communication_amount())
+            path_list.append([_get_map_key(path) for path in communication.get_path()])
+
+        # compute the conflict rate
+        communication_len = len(communication_list)
+        conflict_matrix = [[0]*communication_len for _ in range(0,communication_len)]
+        for i in range(communication_len):
+            # get self occupy time
+            self_occupy_time = sum(map(lambda x: x[1]-x[0], occupy_list[i]))
+            # get ratio
+            for j in range(communication_len):
+                if i == j:
+                    continue
+                if len(set(path_list[i]) & set(path_list[j])) == 0:
+                    continue
+                common_time = 0.
+                range_i, range_j = 0, 0
+                while True:
+                    common_time += max(0,
+                        min(occupy_list[i][range_i][1], occupy_list[j][range_j][1]) - \
+                        max(occupy_list[i][range_i][0], occupy_list[j][range_j][0])
+                    )
+                    # append range_i or range_j
+                    if occupy_list[i][range_i][1] <= occupy_list[j][range_j][0]:
+                        range_i += 1
+                        if range_i >= len(occupy_list[i]):
+                            break
+                    else:
+                        range_j += 1
+                        if range_j >= len(occupy_list[j]):
+                            break
+                conflict_matrix[i][j] = common_time / self_occupy_time
+        # compute the equivalent communication amount
+        r_amount = 0.
+        e_amount = 0.
+        for i in range(communication_len):
+            tmp = amount_list[i] * len(path_list[i])
+            r_amount += tmp
+            for j in range(communication_len):
+                tmp = tmp / (1 - 0.5*conflict_matrix[i][j])
+            e_amount += tmp
+        return r_amount, e_amount
+
     def run(self):
         """
         run the array
@@ -104,126 +196,28 @@ class BaseArray(Component):
         for _, (fitness, tile_list, communication_list, wire_net) in \
             enumerate(self.output_behavior_list):
             # init wire net and schedule
-            wire_net.set_transparent_flag(0)
-            schedule_strategy = Schedule.get_class_(self.schedule_strategy)(
-                communication_list, wire_net
-            )
-            # init current time and time point list
-            current_time = 0.
-            time_point_list = []
-            update_module = self.mapping_strategy.get_update_order(
-                tile_list, communication_list
-            )
-            while True:
-                # running the data
-                for module in update_module:
-                    module.update(current_time)
-                # schedule for the path
-                schedule_strategy.schedule(current_time)
-                # get next time
-                next_time = min([
-                    min([tile.get_computation_end_time() for tile in tile_list]),
-                    min([
-                        communication.get_communication_end_time()
-                        for communication in communication_list
-                    ])
-                ])
-                # check if the simulation is over
-                assert next_time > current_time
-                current_time = next_time
-                if current_time == float("inf"):
-                    break
-                time_point_list.append(current_time)
-            # check if the simulation is over
-            self.check_finish(tile_list, communication_list, wire_net)
+            wire_net.set_transparent_flag(False)
+            time_point_list = self.run_single(tile_list, communication_list, wire_net)
             # log info
-            self.logger.info(f"For the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
+            self.logger.info(f"Origin, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
             self.latency_list.append(time_point_list[-1])
-            
-        """
-        run with transparent wire
-        """
+
         for _, (fitness, tile_list, communication_list, wire_net) in \
             enumerate(self.output_behavior_list_cp):
             # init wire net and schedule
-            wire_net.set_transparent_flag(1)
-            schedule_strategy = Schedule.get_class_(self.schedule_strategy)(
-                communication_list, wire_net
-            )
-            # init current time and time point list
-            current_time = 0.
-            time_point_list = []
-            update_module = self.mapping_strategy.get_update_order(
-                tile_list, communication_list
-            )
-            while True:
-                # running the data
-                for module in update_module:
-                    module.update(current_time)
-                # schedule for the path
-                schedule_strategy.schedule(current_time)
-                # get next time
-                next_time = min([
-                    min([tile.get_computation_end_time() for tile in tile_list]),
-                    min([
-                        communication.get_communication_end_time()
-                        for communication in communication_list
-                    ])
-                ])
-                # check if the simulation is over
-                assert next_time > current_time
-                current_time = next_time
-                if current_time == float("inf"):
-                    break
-                time_point_list.append(current_time)
-            # check if the simulation is over
-            self.check_finish(tile_list, communication_list, wire_net)
-
-            # compute the effective communication amount
-            occupy_list = []
-            path_list = []
-            amount_list = []
-            communication_len = len(communication_list)
-            conflict_matrix = [[0]*communication_len for _ in range(0,communication_len)]
-            for communication in communication_list:
-                occupy_list.append(communication.get_communication_range())
-                amount_list.append(communication.get_communication_amount())
-                path_list = communication.get_path()
-                tmp = [path for path in path_list]
-                # tmp = [_get_map_key(path) for path in path_list]
-                path_list.append(tmp)
-            # compute the conflict rate
-            for i in range(communication_len):
-                self_occupy_time = 0
-                for range_ in occupy_list[i]:
-                    self_occupy_time += range_[1] - range_[0]
-                for j in range(communication_len):
-                    if i == j:
-                        continue
-                    conflict_exist = False
-                    for path in path_list[i]:
-                        if path in path_list[j]:
-                            conflict_exist = True
-                            break
-                    if conflict_exist:
-                        common_time = 0
-                        for range_i in occupy_list[i]:
-                            for range_j in occupy_list[j]:
-                                common_time += max(0, min(range_j[1],range_i[1]) - max(range_j[0],range_i[0]))
-                        conflict_matrix[i][j] = common_time / self_occupy_time
-            # compute the effective communication amount
-            e_amount = 0
-            for i in range(communication_len):
-                tmp = amount_list[i]
-                for j in range(communication_len):
-                    if i == j:
-                        continue
-                    tmp = tmp / (1-conflict_matrix[i][j])
-                e_amount += tmp
+            wire_net.set_transparent_flag(True)
+            time_point_list = self.run_single(tile_list, communication_list, wire_net)
+            self.logger.info(f"Transparent, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
+            r_amount, e_amount = self._get_e_communication(communication_list)
+            self.r_communication_list.append(r_amount)
             self.e_communication_list.append(e_amount)
             # draw / log
-            dataframe = pd.DataFrame({'有效通信量':self.e_communication_list,'latency':self.latency_list})
-            dataframe.to_csv("result.csv",index=False,sep=',')
+        dataframe = pd.DataFrame({
+            "通信总量": self.r_communication_list,
+            "等效通信总量": self.e_communication_list,
+            "延时": self.latency_list
+        })
+        dataframe.to_csv("result.csv", index=False, sep=',')
 
     def check_finish(self, tile_list, communication_list, wire_net):
         """
