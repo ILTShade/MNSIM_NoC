@@ -155,4 +155,7 @@ class BaseCommunication(Component):
         return transfer_amount
 
     def get_layer_info(self):
+        """
+        get the input and output layer id
+        """
         return (self.input_tile.layer_id, self.output_tile.layer_id)

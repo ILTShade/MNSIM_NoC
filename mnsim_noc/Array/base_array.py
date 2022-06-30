@@ -7,12 +7,10 @@
 @CreateTime:
     2021/10/08 18:21
 """
-from bdb import effective
 import time
 import pandas as pd
 import os
 import random
-import string
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -161,7 +159,6 @@ class BaseArray(Component):
         # compute the conflict rate
         communication_len = len(communication_list)
         conflict_matrix = [[0]*communication_len for _ in range(0,communication_len)]
-        effective_communication_list = [[0]*communication_len]
         for i in range(communication_len):
             # get self occupy time
             self_occupy_time = sum(map(lambda x: x[1]-x[0], occupy_list[i]))
@@ -188,16 +185,15 @@ class BaseArray(Component):
                         if range_j >= len(occupy_list[j]):
                             break
                 conflict_matrix[i][j] = common_time / self_occupy_time
-        
         # compute the equivalent communication amount
         r_amount = 0.
         e_amount = 0.
         # compute for each communication
-        effective_communication_list = [[0]*communication_len]
+        effective_communication_list = [0]*communication_len
         for i in range(communication_len):
             tmp = amount_list[i] * len(path_list[i])
-            e_tmp = tmp
             r_amount += tmp
+            e_tmp = tmp
             for j in range(communication_len):
                 # e_tmp = e_tmp / (1 - 0.5*conflict_matrix[i][j])   # repeated divide
                 e_tmp = max(e_tmp, tmp/(1 - 0.5*conflict_matrix[i][j])) # maximum divide
@@ -205,12 +201,13 @@ class BaseArray(Component):
         # compute for each layer
         layer_dict = {}
         for i in range(communication_len):
-            if layer_list[i][0] in layer_dict.keys():
-                layer_dict[layer_list[i][0]] = max(layer_dict[layer_list[i][0]], effective_communication_list[i])
+            key = str(layer_list[i])
+            if key in layer_dict.keys():
+                layer_dict[key] = max(layer_dict[key], effective_communication_list[i])
             else:
-                layer_dict[layer_list[i][0]] = effective_communication_list[i]
+                layer_dict[key] = effective_communication_list[i]
         # sum all layer
-        for _,value in layer_dict.items():
+        for _, value in layer_dict.items():
             e_amount += value
         # return results
         return r_amount, e_amount
