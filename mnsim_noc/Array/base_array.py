@@ -7,7 +7,12 @@
 @CreateTime:
     2021/10/08 18:21
 """
+from bdb import effective
+import time
 import pandas as pd
+import os
+import random
+import string
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -64,6 +69,8 @@ class BaseArray(Component):
         # record the equivalent communication amount
         self.r_communication_list = []
         self.e_communication_list = []
+        # info for csv
+        self.csv_info = '-'.join([str(mapping_strategy), str(schedule_strategy), str(image_num)])
 
     def _get_behavior_number(self, task_behavior_list):
         """
@@ -144,14 +151,17 @@ class BaseArray(Component):
         occupy_list = []
         amount_list = []
         path_list = []
+        layer_list = []
         for communication in communication_list:
             occupy_list.append(communication.get_communication_range())
             amount_list.append(communication.get_communication_amount())
             path_list.append([_get_map_key(path) for path in communication.get_path()])
+            layer_list.append(communication.get_layer_info())
 
         # compute the conflict rate
         communication_len = len(communication_list)
         conflict_matrix = [[0]*communication_len for _ in range(0,communication_len)]
+        effective_communication_list = [[0]*communication_len]
         for i in range(communication_len):
             # get self occupy time
             self_occupy_time = sum(map(lambda x: x[1]-x[0], occupy_list[i]))
@@ -178,15 +188,31 @@ class BaseArray(Component):
                         if range_j >= len(occupy_list[j]):
                             break
                 conflict_matrix[i][j] = common_time / self_occupy_time
+        
         # compute the equivalent communication amount
         r_amount = 0.
         e_amount = 0.
+        # compute for each communication
+        effective_communication_list = [[0]*communication_len]
         for i in range(communication_len):
             tmp = amount_list[i] * len(path_list[i])
+            e_tmp = tmp
             r_amount += tmp
             for j in range(communication_len):
-                tmp = tmp / (1 - 0.5*conflict_matrix[i][j])
-            e_amount += tmp
+                # e_tmp = e_tmp / (1 - 0.5*conflict_matrix[i][j])   # repeated divide
+                e_tmp = max(e_tmp, tmp/(1 - 0.5*conflict_matrix[i][j])) # maximum divide
+            effective_communication_list[i] = e_tmp
+        # compute for each layer
+        layer_dict = {}
+        for i in range(communication_len):
+            if layer_list[i][0] in layer_dict.keys():
+                layer_dict[layer_list[i][0]] = max(layer_dict[layer_list[i][0]], effective_communication_list[i])
+            else:
+                layer_dict[layer_list[i][0]] = effective_communication_list[i]
+        # sum all layer
+        for _,value in layer_dict.items():
+            e_amount += value
+        # return results
         return r_amount, e_amount
 
     def run(self):
@@ -217,7 +243,12 @@ class BaseArray(Component):
             "等效通信总量": self.e_communication_list,
             "延时": self.latency_list
         })
-        dataframe.to_csv("result.csv", index=False, sep=',')
+        random.seed(time.time())
+        for i in range(1000):
+            filename = self.csv_info + f'-{time.localtime().tm_mon}-{time.localtime().tm_mday}-({time.localtime().tm_hour}-{time.localtime().tm_min}-{time.localtime().tm_sec})-{random.randint(0,100000)}.csv'
+            if not os.path.exists(filename):
+                dataframe.to_csv(filename, index=False, sep=',')
+                break
 
     def check_finish(self, tile_list, communication_list, wire_net):
         """

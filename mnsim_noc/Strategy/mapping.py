@@ -254,4 +254,14 @@ class HeuristicMapping(Mapping):
         # output the best candidate
         # return population[0].position_list
         # output all of the candidate
-        return [(cand.fitness, cand.position_list) for cand in population]
+        # output 5 of the candidate
+        choice_list = []
+        num_list = []
+        for i in range(5):
+            while True:
+                choice_index = random.randint(0, len(population)-1)
+                if choice_index not in choice_list:
+                    num_list.append(choice_index)
+                    choice_list.append(population[i])
+                    break
+        return [(cand.fitness, cand.position_list) for cand in choice_list]

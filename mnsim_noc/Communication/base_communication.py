@@ -153,3 +153,6 @@ class BaseCommunication(Component):
             for output in outputs:
                 transfer_amount += get_data_size(output)
         return transfer_amount
+
+    def get_layer_info(self):
+        return (self.input_tile.layer_id, self.output_tile.layer_id)
