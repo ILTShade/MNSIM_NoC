@@ -244,7 +244,7 @@ class BaseArray(Component):
             "延时": self.latency_list
         })
         random.seed(time.time())
-        for i in range(1000):
+        while True:
             filename = self.csv_info + f'-{time.localtime().tm_mon}-{time.localtime().tm_mday}-({time.localtime().tm_hour}-{time.localtime().tm_min}-{time.localtime().tm_sec})-{random.randint(0,100000)}.csv'
             if not os.path.exists(filename):
                 dataframe.to_csv(filename, index=False, sep=',')
