@@ -8,7 +8,6 @@
     2021/10/08 18:21
 """
 import time
-import pandas as pd
 import pickle
 import os
 import random
@@ -64,13 +63,7 @@ class BaseArray(Component):
         self.tile_net_shape = tile_net_shape
 
         # record the latency
-        self.latency_list = []
-        self.fitness_list = []
         self.experiment_list = []
-        self.non_trans_range_list = []
-        # record the equivalent communication amount
-        self.r_communication_list = []
-        self.e_communication_list = []
         # info for csv
         self.csv_info = '-'.join([str(mapping_strategy), str(schedule_strategy), str(image_num)])
 
