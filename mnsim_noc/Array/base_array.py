@@ -9,6 +9,7 @@
 """
 import time
 import pandas as pd
+import pickle
 import os
 import random
 from mnsim_noc.utils.component import Component
@@ -64,6 +65,9 @@ class BaseArray(Component):
 
         # record the latency
         self.latency_list = []
+        self.fitness_list = []
+        self.experiment_list = []
+        self.non_trans_range_list = []
         # record the equivalent communication amount
         self.r_communication_list = []
         self.e_communication_list = []
@@ -211,40 +215,99 @@ class BaseArray(Component):
             e_amount += value
         # return results
         return r_amount, e_amount
-
+    
+    def _get_conflict_matrix(self, communication_list):
+        """
+        get the conflict_matrix and bool_matrix
+        """
+        # compute the equivalent communication amount
+        occupy_list = []
+        path_list = []
+        for communication in communication_list:
+            occupy_list.append(communication.get_communication_range())
+            path_list.append([_get_map_key(path) for path in communication.get_path()])
+        # compute the conflict rate
+        communication_len = len(communication_list)
+        conflict_matrix = [[0]*communication_len for _ in range(0,communication_len)]
+        bool_matrix = [[0]*communication_len for _ in range(0,communication_len)]
+        for i in range(communication_len):
+            # get self occupy time
+            self_occupy_time = sum(map(lambda x: x[1]-x[0], occupy_list[i]))
+            # get ratio
+            for j in range(communication_len):
+                if i == j:
+                    continue
+                if len(set(path_list[i]) & set(path_list[j])) == 0:
+                    continue
+                common_time = 0.
+                range_i, range_j = 0, 0
+                while True:
+                    common_time += max(0,
+                        min(occupy_list[i][range_i][1], occupy_list[j][range_j][1]) - \
+                        max(occupy_list[i][range_i][0], occupy_list[j][range_j][0])
+                    )
+                    # append range_i or range_j
+                    if occupy_list[i][range_i][1] <= occupy_list[j][range_j][0]:
+                        range_i += 1
+                        if range_i >= len(occupy_list[i]):
+                            break
+                    else:
+                        range_j += 1
+                        if range_j >= len(occupy_list[j]):
+                            break
+                conflict_matrix[i][j] = common_time / self_occupy_time
+                bool_matrix[i][j] = int(common_time > 0)
+        return conflict_matrix, bool_matrix
+                
+    
+    def _get_communication_info(self, communication_list):
+        """
+        get the communication information
+        """
+        # compute the equivalent communication amount
+        communication_info_list = []
+        for communication in communication_list:
+            tmp = {}
+            tmp['amount'] = communication.get_communication_amount()
+            tmp['range_t'] = communication.get_communication_range()
+            tmp['path'] = [_get_map_key(path) for path in communication.get_path()]
+            tmp['layer'] = communication.get_layer_info()
+            communication_info_list.append(tmp)
+        return communication_info_list
+    
     def run(self):
         """
-        run the array
+        run the array, first transparent, then original
         """
-        for _, (fitness, tile_list, communication_list, wire_net) in \
-            enumerate(self.output_behavior_list):
-            # init wire net and schedule
-            wire_net.set_transparent_flag(False)
-            time_point_list = self.run_single(tile_list, communication_list, wire_net)
-            # log info
-            self.logger.info(f"Origin, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
-            self.latency_list.append(time_point_list[-1])
-
         for _, (fitness, tile_list, communication_list, wire_net) in \
             enumerate(self.output_behavior_list_cp):
             # init wire net and schedule
             wire_net.set_transparent_flag(True)
             time_point_list = self.run_single(tile_list, communication_list, wire_net)
             self.logger.info(f"Transparent, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
-            r_amount, e_amount = self._get_e_communication(communication_list)
-            self.r_communication_list.append(r_amount)
-            self.e_communication_list.append(e_amount)
-            # draw / log
-        dataframe = pd.DataFrame({
-            "通信总量": self.r_communication_list,
-            "等效通信总量": self.e_communication_list,
-            "延时": self.latency_list
-        })
+            tmp = {}
+            tmp['conflict_matrix'],tmp['bool_matrix'] = self._get_conflict_matrix(communication_list)
+            tmp['communication_info_list'] = self._get_communication_info(communication_list)
+            self.experiment_list.append(tmp)
+        
+        for i, (fitness, tile_list, communication_list, wire_net) in \
+            enumerate(self.output_behavior_list):
+            # init wire net and schedule
+            wire_net.set_transparent_flag(False)
+            time_point_list = self.run_single(tile_list, communication_list, wire_net)
+            # log info
+            self.logger.info(f"Origin, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
+            self.experiment_list[i]['latency'] = time_point_list[-1]
+            self.experiment_list[i]['fitness'] = fitness
+            for j,communication in enumerate(communication_list):
+                self.experiment_list[i]['communication_info_list'][j]['range_o'] = communication.get_communication_range()
+            
         random.seed(time.time())
         while True:
-            filename = self.csv_info + f'-{time.localtime().tm_mon}-{time.localtime().tm_mday}-({time.localtime().tm_hour}-{time.localtime().tm_min}-{time.localtime().tm_sec})-{random.randint(0,100000)}.csv'
+            filename = self.csv_info + f'_{time.localtime().tm_mon}_{time.localtime().tm_mday}_({time.localtime().tm_hour}_{time.localtime().tm_min}_{time.localtime().tm_sec})_{random.randint(0,100000)}.pkl'
             if not os.path.exists(filename):
-                dataframe.to_csv(filename, index=False, sep=',')
+                with open(filename, 'wb') as f:
+                    pickle.dump(self.experiment_list, f)
                 break
 
     def check_finish(self, tile_list, communication_list, wire_net):

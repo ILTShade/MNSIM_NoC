@@ -214,7 +214,7 @@ class HeuristicMapping(Mapping):
         # heuristic search, init parameters
         N = 200
         max_generation = 300
-        output_len = 5
+        output_len = 100
         # 1, init the population, with N possible candidate
         population = [
             Candidate(self.tile_row, self.tile_column, task_tile_num, adjacency_matrix)
@@ -257,4 +257,5 @@ class HeuristicMapping(Mapping):
         # output all of the candidate
         # output output len of the candidate
         choice_list = np.random.choice(range(len(population)), size=output_len, replace=False)
-        return [(cand.fitness, cand.position_list) for cand in choice_list]
+        result_list = [population[choice] for choice in choice_list]
+        return [(cand.fitness, cand.position_list) for cand in result_list]
