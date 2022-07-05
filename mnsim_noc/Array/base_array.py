@@ -11,6 +11,7 @@ import time
 import pickle
 import os
 import random
+import datetime
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -46,11 +47,8 @@ class BaseArray(Component):
         self.mapping_strategy = Mapping.get_class_(mapping_strategy)(
             task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
         )
-        # self.tile_list, self.communication_list, self.wire_net = \
-        # self.mapping_strategy.mapping_net()
-        # self.output_behavior_list = self.mapping_strategy.mapping_net()[0]
-        # self.output_behavior_list_cp = self.mapping_strategy.mapping_net()[1]
-        self.output_behavior_list, self.output_behavior_list_cp = self.mapping_strategy.mapping_net()
+        self.output_behavior_list, self.output_behavior_list_cp = \
+            self.mapping_strategy.mapping_net()
         # set transparent
         self.transparent_flag = transparent_flag
         self.schedule_strategy = schedule_strategy
@@ -62,10 +60,10 @@ class BaseArray(Component):
         self.image_num = image_num
         self.tile_net_shape = tile_net_shape
 
-        # record the latency
-        self.experiment_list = []
+        # record the experiment data
+        self.experiment_data_list = []
         # info for csv
-        self.csv_info = '-'.join([str(mapping_strategy), str(schedule_strategy), str(image_num)])
+        self.csv_info = f"{mapping_strategy}_{schedule_strategy}_{image_num}"
 
     def _get_behavior_number(self, task_behavior_list):
         """
@@ -138,77 +136,6 @@ class BaseArray(Component):
         self.check_finish(tile_list, communication_list, wire_net)
         return time_point_list
 
-    def _get_e_communication(self, communication_list):
-        """
-        get the equivalent communication amount
-        """
-        # compute the equivalent communication amount
-        occupy_list = []
-        amount_list = []
-        path_list = []
-        layer_list = []
-        for communication in communication_list:
-            occupy_list.append(communication.get_communication_range())
-            amount_list.append(communication.get_communication_amount())
-            path_list.append([_get_map_key(path) for path in communication.get_path()])
-            layer_list.append(communication.get_layer_info())
-
-        # compute the conflict rate
-        communication_len = len(communication_list)
-        conflict_matrix = [[0]*communication_len for _ in range(0,communication_len)]
-        for i in range(communication_len):
-            # get self occupy time
-            self_occupy_time = sum(map(lambda x: x[1]-x[0], occupy_list[i]))
-            # get ratio
-            for j in range(communication_len):
-                if i == j:
-                    continue
-                if len(set(path_list[i]) & set(path_list[j])) == 0:
-                    continue
-                common_time = 0.
-                range_i, range_j = 0, 0
-                while True:
-                    common_time += max(0,
-                        min(occupy_list[i][range_i][1], occupy_list[j][range_j][1]) - \
-                        max(occupy_list[i][range_i][0], occupy_list[j][range_j][0])
-                    )
-                    # append range_i or range_j
-                    if occupy_list[i][range_i][1] <= occupy_list[j][range_j][0]:
-                        range_i += 1
-                        if range_i >= len(occupy_list[i]):
-                            break
-                    else:
-                        range_j += 1
-                        if range_j >= len(occupy_list[j]):
-                            break
-                conflict_matrix[i][j] = common_time / self_occupy_time
-        # compute the equivalent communication amount
-        r_amount = 0.
-        e_amount = 0.
-        # compute for each communication
-        effective_communication_list = [0]*communication_len
-        for i in range(communication_len):
-            tmp = amount_list[i] * len(path_list[i])
-            r_amount += tmp
-            e_tmp = tmp
-            for j in range(communication_len):
-                # e_tmp = e_tmp / (1 - 0.5*conflict_matrix[i][j])   # repeated divide
-                e_tmp = max(e_tmp, tmp/(1 - 0.5*conflict_matrix[i][j])) # maximum divide
-            effective_communication_list[i] = e_tmp
-        # compute for each layer
-        layer_dict = {}
-        for i in range(communication_len):
-            key = str(layer_list[i])
-            if key in layer_dict.keys():
-                layer_dict[key] = max(layer_dict[key], effective_communication_list[i])
-            else:
-                layer_dict[key] = effective_communication_list[i]
-        # sum all layer
-        for _, value in layer_dict.items():
-            e_amount += value
-        # return results
-        return r_amount, e_amount
-    
     def _get_conflict_matrix(self, communication_list):
         """
         get the conflict_matrix and bool_matrix
@@ -221,86 +148,107 @@ class BaseArray(Component):
             path_list.append([_get_map_key(path) for path in communication.get_path()])
         # compute the conflict rate
         communication_len = len(communication_list)
-        conflict_matrix = [[0]*communication_len for _ in range(0,communication_len)]
-        bool_matrix = [[0]*communication_len for _ in range(0,communication_len)]
+        occupy_time_vector = [0]*communication_len
+        conflict_matrix = [[0]*communication_len for _ in range(communication_len)]
+        bool_matrix = [[0]*communication_len for _ in range(communication_len)]
         for i in range(communication_len):
             # get self occupy time
-            self_occupy_time = sum(map(lambda x: x[1]-x[0], occupy_list[i]))
+            occupy_time_vector[i] = sum(map(lambda x: x[1]-x[0], occupy_list[i]))
             # get ratio
             for j in range(communication_len):
                 if i == j:
                     continue
                 if len(set(path_list[i]) & set(path_list[j])) == 0:
-                    continue
+                    bool_matrix[i][j] = 0
+                else:
+                    bool_matrix[i][j] = 1
+                # get the conflict time
                 common_time = 0.
-                range_i, range_j = 0, 0
+                index_i, index_j = 0, 0
                 while True:
                     common_time += max(0,
-                        min(occupy_list[i][range_i][1], occupy_list[j][range_j][1]) - \
-                        max(occupy_list[i][range_i][0], occupy_list[j][range_j][0])
+                        min(occupy_list[i][index_i][1], occupy_list[j][index_j][1]) - \
+                        max(occupy_list[i][index_i][0], occupy_list[j][index_j][0])
                     )
-                    # append range_i or range_j
-                    if occupy_list[i][range_i][1] <= occupy_list[j][range_j][0]:
-                        range_i += 1
-                        if range_i >= len(occupy_list[i]):
+                    # forward index_i or index_j
+                    if occupy_list[i][index_i][1] <= occupy_list[j][index_j][1]:
+                        index_i += 1
+                        if index_i >= len(occupy_list[i]):
                             break
                     else:
-                        range_j += 1
-                        if range_j >= len(occupy_list[j]):
+                        index_j += 1
+                        if index_j >= len(occupy_list[j]):
                             break
-                conflict_matrix[i][j] = common_time / self_occupy_time
-                bool_matrix[i][j] = int(common_time > 0)
-        return conflict_matrix, bool_matrix
-                
-    
+                conflict_matrix[i][j] = common_time
+        return occupy_time_vector, conflict_matrix, bool_matrix
+
     def _get_communication_info(self, communication_list):
         """
         get the communication information
         """
-        # compute the equivalent communication amount
+        # get the communication info list
         communication_info_list = []
         for communication in communication_list:
-            tmp = {}
-            tmp['amount'] = communication.get_communication_amount()
-            tmp['range_t'] = communication.get_communication_range()
-            tmp['path'] = [_get_map_key(path) for path in communication.get_path()]
-            tmp['layer'] = communication.get_layer_info()
-            communication_info_list.append(tmp)
+            communication_info = {}
+            communication_info['amount'] = communication.get_communication_amount()
+            communication_info['range_t'] = communication.get_communication_range()
+            communication_info['path'] = [_get_map_key(path) for path in communication.get_path()]
+            communication_info['layer'] = communication.get_layer_info()
+            communication_info_list.append(communication_info)
         return communication_info_list
-    
+
     def run(self):
         """
         run the array, first transparent, then original
         """
+        # add for the transparent flag
+        self.experiment_data_list = []
         for _, (fitness, tile_list, communication_list, wire_net) in \
             enumerate(self.output_behavior_list_cp):
             # init wire net and schedule
             wire_net.set_transparent_flag(True)
             time_point_list = self.run_single(tile_list, communication_list, wire_net)
-            self.logger.info(f"Transparent, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
-            tmp = {}
-            tmp['conflict_matrix'],tmp['bool_matrix'] = self._get_conflict_matrix(communication_list)
-            tmp['communication_info_list'] = self._get_communication_info(communication_list)
-            self.experiment_list.append(tmp)
-        
+            self.logger.info(
+                f"Transparent, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}"
+            )
+            experiment_data = {}
+            # conflict matrix and others
+            occupy_time_vector, conflict_matrix, bool_matrix = \
+                self._get_conflict_matrix(communication_list)
+            experiment_data['occupy_time_vector'] = occupy_time_vector
+            experiment_data['conflict_matrix'] = conflict_matrix
+            experiment_data['bool_matrix'] = bool_matrix
+            experiment_data['communication_info_list'] = \
+                self._get_communication_info(communication_list)
+            # latency and others
+            experiment_data["latency_t"] = time_point_list[-1]
+            experiment_data["fitness_t"] = fitness
+            self.experiment_data_list.append(experiment_data)
+        # add for the original flag
         for i, (fitness, tile_list, communication_list, wire_net) in \
             enumerate(self.output_behavior_list):
             # init wire net and schedule
             wire_net.set_transparent_flag(False)
             time_point_list = self.run_single(tile_list, communication_list, wire_net)
             # log info
-            self.logger.info(f"Origin, for the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
-            self.experiment_list[i]['latency'] = time_point_list[-1]
-            self.experiment_list[i]['fitness'] = fitness
-            for j,communication in enumerate(communication_list):
-                self.experiment_list[i]['communication_info_list'][j]['range_o'] = communication.get_communication_range()
-            
+            self.logger.info(
+                f"Original, for the {i}th: {fitness}, {time_point_list[-1]/1e6:.3f}"
+            )
+            # latency and others
+            self.experiment_data_list[i]["latency_o"] = time_point_list[-1]
+            self.experiment_data_list[i]["fitness_o"] = fitness
+            for j, communication in enumerate(communication_list):
+                self.experiment_data_list[i]["communication_info_list"][j]["range_o"] = \
+                    communication.get_communication_range()
+        # save the experiment data
         random.seed(time.time())
         while True:
-            filename = self.csv_info + f'_{time.localtime().tm_mon}_{time.localtime().tm_mday}_({time.localtime().tm_hour}_{time.localtime().tm_min}_{time.localtime().tm_sec})_{random.randint(0,100000)}.pkl'
+            filename = self.csv_info + \
+                datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + \
+                f"_{random.randint(0, 1000000)}.pkl"
             if not os.path.exists(filename):
                 with open(filename, 'wb') as f:
-                    pickle.dump(self.experiment_list, f)
+                    pickle.dump(self.experiment_data_list, f)
                 break
 
     def check_finish(self, tile_list, communication_list, wire_net):
