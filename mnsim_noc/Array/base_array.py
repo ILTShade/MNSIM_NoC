@@ -243,7 +243,7 @@ class BaseArray(Component):
         # save the experiment data
         random.seed(time.time())
         while True:
-            filename = self.csv_info + \
+            filename = self.csv_info + "_" +\
                 datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + \
                 f"_{random.randint(0, 1000000)}.pkl"
             if not os.path.exists(filename):

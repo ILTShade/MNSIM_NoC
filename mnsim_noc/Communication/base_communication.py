@@ -158,4 +158,8 @@ class BaseCommunication(Component):
         """
         get the input and output layer id
         """
-        return (self.input_tile.layer_id, self.output_tile.layer_id)
+        return (
+            (self.input_tile.layer_id, self.input_tile.position),
+            (self.output_tile.layer_id, self.output_tile.position)
+        )
+        # return (self.input_tile.layer_id, self.output_tile.layer_id)
