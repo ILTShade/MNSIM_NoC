@@ -12,7 +12,7 @@ from mnsim_noc.Buffer.base_buffer import get_data_size
 
 class BaseWire(Component):
     """
-    Base Wire Class for bahahavior-driven simulation
+    Base Wire Class for behavior-driven simulation
     position: tuple -> (start, end)
         start, end -> (row, column)
     """
@@ -25,6 +25,7 @@ class BaseWire(Component):
         self.running_state = False
         self.transparent_flag = False
         self.transfer_time_range = {}
+        self.wire_range = []
 
     def get_transfer_time(self, data_list):
         """
@@ -46,6 +47,7 @@ class BaseWire(Component):
         else:
             # add end time
             self.transfer_time_range[communication_id][-1].append(current_time)
+            self.wire_range.append(self.transfer_time_range[communication_id][-1])
         if self.transparent_flag:
             return None
         assert wire_state != self.running_state

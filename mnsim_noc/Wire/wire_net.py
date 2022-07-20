@@ -247,12 +247,27 @@ class WireNet(Component):
                 wire_position = ((i, j), (i, j + 1))
                 horizontal_rate[i, j] = \
                     self.wires_map[_get_map_key(wire_position)].get_running_rate(end_time)
-        vectical_rate = np.zeros(
+        vertical_rate = np.zeros(
             [self.tile_net_shape[0] - 1, self.tile_net_shape[1]]
         )
         for i in range(self.tile_net_shape[0] - 1):
             for j in range(self.tile_net_shape[1]):
                 wire_position = ((i, j), (i + 1, j))
-                vectical_rate[i, j] = \
+                vertical_rate[i, j] = \
                     self.wires_map[_get_map_key(wire_position)].get_running_rate(end_time)
-        return horizontal_rate, vectical_rate
+        return horizontal_rate, vertical_rate
+
+    def get_wire_range(self):
+        """
+        get wire range for all of the wire
+        """
+        wire_range_list = []
+        for key, item in self.wires_map.items():
+            wire_range = item.wire_range
+            if len(wire_range) == 0:
+                continue
+            wire_range_list.append({
+                "wire_position": key,
+                "range": wire_range,
+            })
+        return wire_range_list

@@ -8,6 +8,7 @@
     2021/10/08 18:21
 """
 import numpy as np
+import pickle
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -135,7 +136,7 @@ class BaseArray(Component):
         """
         show the latency and throughput
         """
-        # show the computation andcommunication range on each task and each image
+        # show the computation and communication range on each task and each image
         complete_time = {} # each task, and list for each image
         for tile in self.tile_list:
             task_id = tile.task_id
@@ -184,7 +185,7 @@ class BaseArray(Component):
             position = tile.position
             tile_task_id[position] = tile.task_id + 1 # start from 1
             tile_load_rate[position] = tile.get_running_rate(end_time)
-        horizontal_rate, vectical_rate = self.wire_net.get_running_rate(end_time)
+        horizontal_rate, vertical_rate = self.wire_net.get_running_rate(end_time)
         # get show tile row and show tile column
         show_tile_row = max([tile.position[0] for tile in self.tile_list]) + 1
         show_tile_column = max([tile.position[1] for tile in self.tile_list]) + 1
@@ -206,15 +207,33 @@ class BaseArray(Component):
             for j in range(show_tile_column - 1):
                 row_str += f"{tile_task_id[i,j]}-{horizontal_rate[i,j]:.3f}-"
             self.logger.info(row_str + f"{tile_task_id[i, show_tile_column-1]}")
-            # vectical
+            # vertical
             split_str = "   ".join(["|    " for _ in range(show_tile_column)])
             if i != show_tile_row-1:
                 self.logger.info(split_str)
                 self.logger.info("   ".join([
-                    f"{vectical_rate[i,j]:.3f}" for _ in range(show_tile_column)
+                    f"{vertical_rate[i,j]:.3f}" for _ in range(show_tile_column)
                 ]))
                 self.logger.info(split_str)
-        return tile_task_id, tile_load_rate, horizontal_rate, vectical_rate
+        return tile_task_id, tile_load_rate, horizontal_rate, vertical_rate
+
+    def get_communication_wire_info(self):
+        """
+        get communication info and wire info, range
+        """
+        communication_info_list = []
+        for communication in self.communication_list:
+            communication_info_list.append({
+                "start_tile": communication.input_tile.position,
+                "end_tile": communication.output_tile.position,
+                "range": communication.get_communication_range(),
+            })
+        wire_info_list = self.wire_net.get_wire_range()
+        # save file
+        file_name = "tmp.pkl"
+        with open(file_name, "wb") as f:
+            pickle.dump(communication_info_list, f)
+            pickle.dump(wire_info_list, f)
 
     def show_simulation_result(self):
         """
@@ -222,3 +241,4 @@ class BaseArray(Component):
         """
         self.show_latency_throughput()
         # self.show_tile_wire_rate()
+        self.get_communication_wire_info()
