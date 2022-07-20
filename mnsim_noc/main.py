@@ -62,4 +62,3 @@ def main(config, task, mapping_strategy, schedule_strategy, transprent_flag):
     )
     # array run and show config
     array.run()
-    array.show_simulation_result()
