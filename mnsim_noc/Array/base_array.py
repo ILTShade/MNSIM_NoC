@@ -7,8 +7,9 @@
 @CreateTime:
     2021/10/08 18:21
 """
+import time
 import numpy as np
-import pickle
+# import pickle
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -34,7 +35,7 @@ class BaseArray(Component):
         self.logger.info(f"\tThe buffer size is {buffer_size}")
         self.logger.info(f"\tThe band width is {band_width}")
         self.logger.info(
-            f"\tStartegy are {mapping_strategy}, {schedule_strategy}, {transparent_flag}"
+            f"\tStrategy are {mapping_strategy}, {schedule_strategy}, {transparent_flag}"
         )
         # show the array
         self._get_behavior_number(task_behavior_list)
@@ -94,6 +95,7 @@ class BaseArray(Component):
         """
         run the array
         """
+        output_list = []
         for _, (fitness, tile_list, communication_list, wire_net) in \
             enumerate(self.output_behavior_list):
             # init wire net and schedule
@@ -107,6 +109,7 @@ class BaseArray(Component):
             update_module = self.mapping_strategy.get_update_order(
                 tile_list, communication_list
             )
+            start_time = time.time()
             while True:
                 # running the data
                 for module in update_module:
@@ -127,10 +130,15 @@ class BaseArray(Component):
                 if current_time == float("inf"):
                     break
                 time_point_list.append(current_time)
+            end_time = time.time()
+            output_list.append((end_time - start_time, time_point_list[-1]/1e6))
             # check if the simulation is over
             self.check_finish(tile_list, communication_list, wire_net)
             # log info
             self.logger.info(f"For the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
+            # save for the output
+            output_list = np.array(output_list)
+            np.savetxt("output_info.txt", output_list, fmt="%.3f")
 
     def check_finish(self, tile_list, communication_list, wire_net):
         """
