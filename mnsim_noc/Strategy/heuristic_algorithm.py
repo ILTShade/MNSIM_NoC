@@ -10,8 +10,168 @@
     2022/06/07 16:08
 """
 import math
+import copy
 import numpy as np
 from mnsim_noc.utils.component import Component
+
+class Individual(Component):
+    """
+    individual class for heuristic node grouping
+    """
+    REGISTRY = "individual"
+    NAME = "node_grouping"
+
+    def __init__(self, tile_row, tile_column, tile_num, rank_list):
+        """
+        init for individual, rank_list is a ordered list
+        [((start_tile_id, end_tile_id), comm)]
+        The most important params are map_list and position_list
+        """
+        super(Individual).__init__()
+        self.tile_row = tile_row
+        self.tile_column = tile_column
+        self.tile_num = tile_num
+        self.total_comm = 0
+        self.rank_list = rank_list
+        self.map_list = [[-1]*self.tile_column for _ in range(0,self.tile_row)]
+        self.position_list = [None]*tile_num
+
+    # tool functions for random mapping
+    def get_nearest_pos(self, pos, map_list):
+        """
+        get nearest position, random if there are multiple
+        """
+        max_distance = self.tile_row - 1 + self.tile_column - 1
+        for distance in range(1, max_distance + 1):
+            pl1 = [
+                (pos[0] + i, pos[1] + distance - abs(i))
+                for i in range(-distance, distance)
+            ]
+            pl2 = [
+                (pos[0] + i, pos[1] - distance + abs(i))
+                for i in range(distance, -distance, -1)
+            ]
+            pl = list(set(pl1) | set(pl2))
+            assert len(pl) == distance * 4
+            pl = list(filter(
+                lambda loc: 0 <= loc[0] < self.tile_row and \
+                    0 <= loc[1] < self.tile_column and \
+                    map_list[loc[0]][loc[1]] == -1,
+                pl
+            ))
+            # if there is no pl, continue
+            if len(pl) == 0:
+                continue
+            choice_index = np.random.choice(len(pl), 1)[0]
+            return pl[choice_index]
+
+    def get_random_point(self, tile_id, map_list, position_list):
+        """
+        get a random point
+        for specified tile id, random probability to get a random point
+        """
+        # get position dict probability
+        position_dict = {}
+        for i in range(self.tile_row):
+            for j in range(self.tile_column):
+                status = map_list[i][j]
+                if status == -1:
+                    # there is no tile here
+                    continue
+                for offset_x, offset_y in [(0,1),(-1,0),(0,-1),(1,0)]:
+                    x = i + offset_x
+                    y = j + offset_y
+                    if 0 <= x < self.tile_row and \
+                        0 <= y < self.tile_column and \
+                        map_list[x][y] == -1:
+                        # get probability to get a random point
+                        if (x,y) not in position_dict.keys():
+                            position_dict[(x,y)] = abs(tile_id - map_list[i][j])
+                        else:
+                            position_dict[(x,y)] = min(
+                                position_dict[(x,y)],
+                                abs(tile_id - map_list[i][j])
+                            )
+        # get a random point
+        position_list = list(position_dict.items())
+        if len(position_list) == 0:
+            return (int(self.tile_row/2), int(self.tile_column/2))
+        pl = [x[0] for x in position_list]
+        pp = np.array([x[1]**(-1) for x in position_list])
+        pp = pp/np.sum(pp)
+        choice_index = np.random.choice(len(pl), 1, p=pp)[0]
+        return pl[choice_index]
+
+    # generate a random mapping result
+    def random_mapping(self):
+        """
+        random mapping based on the rank list
+        """
+        for link in self.rank_list:
+            tile_1 = link[0][0]
+            tile_2 = link[0][1]
+            pos_1 = self.position_list[tile_1]
+            pos_2 = self.position_list[tile_2]
+            if pos_1 is not None:
+                if pos_2 is not None:
+                    continue
+                loc = self.get_nearest_pos(pos_1, self.map_list)
+                self.position_list[tile_2] = loc
+                self.map_list[loc[0]][loc[1]] = tile_2
+            else:
+                if pos_2 is not None:
+                    loc = self.get_nearest_pos(pos_2, self.map_list)
+                    self.position_list[tile_1] = loc
+                    self.map_list[loc[0]][loc[1]] = tile_1
+                else:
+                    # the most important part
+                    loc_1 = self.get_random_point(tile_1, self.map_list, self.position_list)
+                    self.position_list[tile_1] = loc_1
+                    self.map_list[loc_1[0]][loc_1[1]] = tile_1
+                    # map the second tile on the nearest place
+                    loc_2 = self.get_nearest_pos(loc_1, self.map_list)
+                    self.position_list[tile_2] = loc_2
+                    self.map_list[loc_2[0]][loc_2[1]] = tile_2
+
+    # mutation for the parent
+    def mutation_remap(self, parent):
+        """
+        mutation for one parent individual
+        """
+        self.map_list = copy.deepcopy(parent.map_list)
+        self.position_list = copy.deepcopy(parent.position_list)
+        # mutate scale of total position, not only last part
+        ratio = 0.25
+        cut_index = np.random.choice(a=self.tile_num, size=int(self.tile_num*ratio), replace=False)
+        cut_index = cut_index.tolist()
+        for index in cut_index:
+            loc = self.position_list[index]
+            # re initialize the position
+            self.position_list[index] = None
+            self.map_list[loc[0]][loc[1]] = -1
+        self.random_mapping()
+
+    # crossover
+    def crossover(self, parent1, parent2):
+        """
+        crossover for two parent individual
+        """
+        pass
+
+    # update total comm
+    def update_total_comm(self):
+        """
+        get update total comm
+        """
+        total_comm = 0
+        for link in self.rank_list:
+            tile_1 = link[0][0]
+            tile_2 = link[0][1]
+            pos_1 = self.position_list[tile_1]
+            pos_2 = self.position_list[tile_2]
+            comm = link[1]
+            total_comm += comm * (abs(pos_1[0]-pos_2[0])+abs(pos_1[1]-pos_2[1]))
+        self.total_comm = total_comm
 
 class Candidate(Component):
     """

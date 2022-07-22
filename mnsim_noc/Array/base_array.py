@@ -7,9 +7,10 @@
 @CreateTime:
     2021/10/08 18:21
 """
+import os
 import time
 import numpy as np
-# import pickle
+import random
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -137,8 +138,14 @@ class BaseArray(Component):
             # log info
             self.logger.info(f"For the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
             # save for the output
-            output_list = np.array(output_list)
-            np.savetxt("output_info.txt", output_list, fmt="%.3f")
+        output_list = np.array(output_list)
+        while True:
+            file_name = f"output_info_{random.randint(1, 99):02d}.txt"
+            if os.path.exists(file_name):
+                continue
+            np.savetxt(file_name, output_list, fmt="%.3f")
+            self.logger.info(f"The output info is saved in {file_name}")
+            break
 
     def check_finish(self, tile_list, communication_list, wire_net):
         """
