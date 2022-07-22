@@ -202,11 +202,16 @@ class PresetMapping(Mapping):
     """
     NAME = "preset"
     def _get_position_list(self, tile_behavior_list):
-        with open("/home/nfs_data/sunhanbo/heuristic_mapping/position_list.pkl", "rb") as f:
+        file_name = os.path.join(
+            "/home/nfs_data/sunhanbo/heuristic_mapping/outputs",
+            "node_gnn_resnet18_search_process.pkl"
+        )
+        with open(file_name, "rb") as f:
             position_population = pickle.load(f)
         for position_list in position_population:
             assert len(position_list) == len(tile_behavior_list), \
                 "the length of position list should be equal to the length of tile_list"
+        self.logger.info(f"load from {file_name}")
         return [(None, position_list) for position_list in position_population]
 
 
