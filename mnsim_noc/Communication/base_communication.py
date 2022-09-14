@@ -12,6 +12,7 @@
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Tile import BaseTile
 from mnsim_noc.Wire import WireNet
+from mnsim_noc.Buffer.base_buffer import get_data_size
 
 class BaseCommunication(Component):
     """
@@ -141,3 +142,21 @@ class BaseCommunication(Component):
             end - start for start, end in self.communication_range_time
         ])
         return communication_time * 1. / end_time
+
+    def get_residual_data(self):
+        """
+        get the residual data count
+        """
+        assert self.input_tile.image_num == 1, f"only support image num 1"
+        residual_data = 0.
+        for i in range(self.number_done_communication, self.number_total_communication):
+            for s in self.input_tile.tile_behavior_cfg["dependence"][i]["output"]:
+                residual_data += get_data_size(s)
+        # total
+        total_data = 0.
+        for i in range(self.number_done_communication):
+            for s in self.input_tile.tile_behavior_cfg["dependence"][i]["output"]:
+                total_data += get_data_size(s)
+        if total_data == 0.:
+            return 0.
+        return residual_data ** 2 / total_data

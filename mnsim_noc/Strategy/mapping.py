@@ -196,6 +196,26 @@ class SnakeMapping(Mapping):
         # return list
         return [(None, position_list[:len(tile_behavior_list)])]
 
+class ImpactMapping(Mapping):
+    """
+    impact mapping
+    """
+    NAME = "impact"
+    def _get_position_list(self, tile_behavior_list):
+        """
+        get position list
+        0, 1, 2,
+        5, 4, 3,
+        6, 7, 8,
+        """
+        position_list = []
+        for i in range(self.tile_row):
+            row = [(i, j) for j in range(self.tile_column)]
+            row = row[::-1] if i % 2 == 1 else row
+            position_list += row
+        # return list
+        return [(None, position_list[:len(tile_behavior_list)])]
+
 class PresetMapping(Mapping):
     """
     preset mapping
