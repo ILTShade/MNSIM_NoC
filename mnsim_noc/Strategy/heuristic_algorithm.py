@@ -141,7 +141,7 @@ class Individual(Component):
         self.map_list = copy.deepcopy(parent.map_list)
         self.position_list = copy.deepcopy(parent.position_list)
         # mutate scale of total position, not only last part
-        ratio = 0.25
+        ratio = 0.5
         cut_index = np.random.choice(a=self.tile_num, size=int(self.tile_num*ratio), replace=False)
         cut_index = cut_index.tolist()
         for index in cut_index:

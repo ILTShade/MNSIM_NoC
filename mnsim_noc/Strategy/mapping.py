@@ -10,7 +10,6 @@
     2022/05/07 20:43
 """
 import abc
-import random
 import copy
 import time
 import pickle
@@ -28,10 +27,11 @@ class Mapping(Component):
     mapping strategy for behavior driven simulation
     """
     REGISTRY = "mapping"
-    def __init__(self, task_behavior_list, image_num,
+    def __init__(self, task_name_label, task_behavior_list, image_num,
         tile_net_shape, buffer_size, band_width
     ):
         super(Mapping, self).__init__()
+        self.task_name_label = task_name_label
         self.task_behavior_list = task_behavior_list
         self.image_num = image_num
         self.tile_row = tile_net_shape[0]
@@ -270,6 +270,12 @@ class NodeGroup(Mapping):
             child = []
             start_time = time.time()
             for individual in population:
+                # one child
+                new_child = Individual(self.tile_row, self.tile_column, tile_num, rank_list)
+                new_child.mutation_remap(individual)
+                new_child.update_total_comm()
+                child.append(new_child)
+                # next
                 new_child = Individual(self.tile_row, self.tile_column, tile_num, rank_list)
                 new_child.mutation_remap(individual)
                 new_child.update_total_comm()
@@ -284,14 +290,10 @@ class NodeGroup(Mapping):
         # 3. choose the best mapping result
         position_list = population[0].position_list
         self.logger.info(f"final min comm: {population[0].total_comm}")
-        while True:
-            file_name = f"{self.NAME}_position_time_record_{random.randint(1, 99):02d}.pkl"
-            if os.path.exists(file_name):
-                continue
-            with open(file_name, "wb") as f:
-                pickle.dump(save_position_list, f)
-                pickle.dump(time_cost_list, f)
-            break
+        file_name = f"position_time_record_{self.task_name_label}_Ours.pkl"
+        with open(file_name, "wb") as f:
+            pickle.dump(save_position_list, f)
+            pickle.dump(time_cost_list, f)
         self.logger.info(f"save file to {file_name}")
         # return list
         return [(None, position_list)]
@@ -320,7 +322,8 @@ class HeuristicMapping(Mapping):
         time_cost_list = []
         output_position_list = []
         # 2, mutation, crossover, and filter, for max_generation epoch
-        for _ in range(max_generation):
+        for epoch in range(max_generation):
+            self.logger.info(f"epoch: {epoch}")
             start_time = time.time()
             # 2.1, mutation for all
             mutation_population = [candidate.mutation() for candidate in population]
@@ -329,7 +332,7 @@ class HeuristicMapping(Mapping):
             probability = probability / probability.sum()
             crossover_pair = np.random.choice(
                 list(range(len(population))),
-                size=(len(population), 2),
+                size=(len(population)//2, 2),
                 p=probability
             ).tolist()
             crossover_population = [
@@ -356,14 +359,10 @@ class HeuristicMapping(Mapping):
                 population[choice_index].position_list,
             ))
         # save for file
-        while True:
-            file_name = f"{self.NAME}_position_time_record_{random.randint(1, 99):02d}.pkl"
-            if os.path.exists(file_name):
-                continue
-            with open(file_name, "wb") as f:
-                pickle.dump(save_position_list, f)
-                pickle.dump(time_cost_list, f)
-            break
+        file_name = f"position_time_record_{self.task_name_label}_{self.NAME}.pkl"
+        with open(file_name, "wb") as f:
+            pickle.dump(save_position_list, f)
+            pickle.dump(time_cost_list, f)
         self.logger.info(f"save file to {file_name}")
         # output the best candidate
         # return population[0].position_list

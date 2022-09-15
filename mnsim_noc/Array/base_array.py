@@ -7,10 +7,8 @@
 @CreateTime:
     2021/10/08 18:21
 """
-import os
 import time
 import numpy as np
-import random
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -21,11 +19,12 @@ class BaseArray(Component):
     """
     REGISTRY = "array"
     NAME = "behavior_driven"
-    def __init__(self, task_behavior_list, image_num,
+    def __init__(self, task_name_label, task_behavior_list, image_num,
         tile_net_shape, buffer_size, band_width,
         mapping_strategy="naive", schedule_strategy="naive", transparent_flag=False
     ):
         super(BaseArray, self).__init__()
+        self.task_name_label = task_name_label
         # logging
         self.logger.info("Initializing the array")
         self.logger.info(f"\tThere are {len(task_behavior_list)} tasks")
@@ -42,7 +41,7 @@ class BaseArray(Component):
         self._get_behavior_number(task_behavior_list)
         # init
         self.mapping_strategy = Mapping.get_class_(mapping_strategy)(
-            task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
+            task_name_label, task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
         )
         # self.tile_list, self.communication_list, self.wire_net = \
         # self.mapping_strategy.mapping_net()
@@ -139,13 +138,9 @@ class BaseArray(Component):
             self.logger.info(f"For the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
             # save for the output
         output_list = np.array(output_list)
-        while True:
-            file_name = f"output_info_{random.randint(1, 99):02d}.txt"
-            if os.path.exists(file_name):
-                continue
-            np.savetxt(file_name, output_list, fmt="%.3f")
-            self.logger.info(f"The output info is saved in {file_name}")
-            break
+        file_name = f"output_info_{self.task_name_label}.txt"
+        np.savetxt(file_name, output_list, fmt="%.3f")
+        self.logger.info(f"The output info is saved in {file_name}")
 
     def check_finish(self, tile_list, communication_list, wire_net):
         """

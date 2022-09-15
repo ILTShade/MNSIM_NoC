@@ -7,6 +7,7 @@
 @CreateTime:
     2021/10/08 18:48
 """
+import os
 import pickle
 
 import click
@@ -20,8 +21,8 @@ from mnsim_noc.utils.yaml_io import read_yaml
 @click.option("--task", type=str, help="task file path list")
 @click.option("--mapping_strategy", "-M", type=str, help="mapping strategy")
 @click.option("--schedule_strategy", "-S", type=str, help="schedule strategy")
-@click.option("--transprent_flag", "-T", is_flag=True, default=False, help="transparent mode")
-def main(config, task, mapping_strategy, schedule_strategy, transprent_flag):
+@click.option("--transparent_flag", "-T", is_flag=True, default=False, help="transparent mode")
+def main(config, task, mapping_strategy, schedule_strategy, transparent_flag):
     """
     main function
     """
@@ -43,19 +44,24 @@ def main(config, task, mapping_strategy, schedule_strategy, transprent_flag):
     schedule_strategy = array_config.get("schedule_strategy", "naive") \
         if schedule_strategy is None else schedule_strategy
     transparent_flag = array_config.get("transparent_flag", False) \
-        if transprent_flag is None else transprent_flag
-    # overide config
+        if transparent_flag is None else transparent_flag
+    # override config
     # load task config behavior list
     task_config_path_list = array_config.get("task_config_path_list", []) \
         if task is None else task.split(",")
     assert len(task_config_path_list) > 0, "task config path list is empty"
     task_behavior_list = []
+    task_name_label = []
     for i, task_config_path in enumerate(task_config_path_list):
         print(f"loading {i}th task config from {task_config_path} ")
         with open(task_config_path, "rb") as f:
             task_behavior_list.append(pickle.load(f))
+        task_name_label.append(os.path.splitext(os.path.basename(task_config_path))[0])
+    task_name_label = ",".join(task_name_label)
+    print(f"task name label: {task_name_label}")
     # create array
     array = BaseArray(
+        task_name_label,
         task_behavior_list, image_num,
         tile_net_shape, buffer_size, band_width,
         mapping_strategy, schedule_strategy, transparent_flag
