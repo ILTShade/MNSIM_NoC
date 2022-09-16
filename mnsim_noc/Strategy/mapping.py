@@ -235,6 +235,21 @@ class PresetMapping(Mapping):
         return [(None, position_list) for position_list in position_population]
 
 
+def _filter_individual(elite):
+    """
+    filter individuals by unique hash
+    """
+    already_hash = set()
+    elite_new = []
+    for individual in elite:
+        unique_hash = individual.hash_label
+        assert unique_hash is not None
+        if unique_hash not in already_hash:
+            elite_new.append(individual)
+            already_hash.add(unique_hash)
+    return elite_new
+
+
 class NodeGroup(Mapping):
     """
     node group algorithm
@@ -266,7 +281,7 @@ class NodeGroup(Mapping):
             population.append(individual)
         # 1. generation child
         for epoch in range(maxGEN):
-            self.logger.info(f"epoch: {epoch}")
+            self.logger.info(f"epoch {epoch} running")
             child = []
             start_time = time.time()
             for individual in population:
@@ -275,28 +290,26 @@ class NodeGroup(Mapping):
                 new_child.mutation_remap(individual)
                 new_child.update_total_comm()
                 child.append(new_child)
-                # next
-                new_child = Individual(self.tile_row, self.tile_column, tile_num, rank_list)
-                new_child.mutation_remap(individual)
-                new_child.update_total_comm()
-                child.append(new_child)
-            elite = sorted(population+child, key=lambda s:s.total_comm)
+            elite = _filter_individual(population + child)
+            self.logger.info(
+                "filter individual from {} to {}".format(len(population+child), len(elite))
+            )
+            elite = sorted(elite, key=lambda s:s.total_comm)
             population = elite[:N]
             end_time = time.time()
             save_position_list.append([
                 copy.deepcopy(x.position_list) for x in population
             ])
             time_cost_list.append(end_time-start_time)
-        # 3. choose the best mapping result
-        position_list = population[0].position_list
-        self.logger.info(f"final min comm: {population[0].total_comm}")
+        # save to file
         file_name = f"position_time_record_{self.task_name_label}_Ours.pkl"
         with open(file_name, "wb") as f:
             pickle.dump(save_position_list, f)
             pickle.dump(time_cost_list, f)
         self.logger.info(f"save file to {file_name}")
-        # return list
-        return [(None, position_list)]
+        # 3. choose all of the mapping result
+        outputs = [(None, x.position_list) for x in population]
+        return outputs
 
 class HeuristicMapping(Mapping):
     """
@@ -358,7 +371,7 @@ class HeuristicMapping(Mapping):
                 population[choice_index].fitness,
                 population[choice_index].position_list,
             ))
-        # save for file
+        # save to file
         file_name = f"position_time_record_{self.task_name_label}_{self.NAME}.pkl"
         with open(file_name, "wb") as f:
             pickle.dump(save_position_list, f)

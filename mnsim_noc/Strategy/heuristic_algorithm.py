@@ -35,6 +35,7 @@ class Individual(Component):
         self.rank_list = rank_list
         self.map_list = [[-1]*self.tile_column for _ in range(0,self.tile_row)]
         self.position_list = [None]*tile_num
+        self.hash_label = None
 
     # tool functions for random mapping
     def get_nearest_pos(self, pos, map_list):
@@ -141,7 +142,7 @@ class Individual(Component):
         self.map_list = copy.deepcopy(parent.map_list)
         self.position_list = copy.deepcopy(parent.position_list)
         # mutate scale of total position, not only last part
-        ratio = 0.5
+        ratio = 0.1667
         cut_index = np.random.choice(a=self.tile_num, size=int(self.tile_num*ratio), replace=False)
         cut_index = cut_index.tolist()
         for index in cut_index:
@@ -156,14 +157,25 @@ class Individual(Component):
         """
         crossover for two parent individual
         """
-        pass
+        raise NotImplementedError
+
+    def _get_unique_hash(self, position_list):
+        """
+        get unique hash for the position list
+        """
+        hash_position_list = []
+        for i in range(self.tile_num):
+            assert position_list[i] is not None, \
+                "position list should not be None"
+            hash_position_list.append(position_list[i][0]*self.tile_column + position_list[i][1])
+        return str(hash_position_list)
 
     # update total comm
     def update_total_comm(self):
         """
         get update total comm
         """
-        total_comm = 0
+        total_comm = 0.
         for link in self.rank_list:
             tile_1 = link[0][0]
             tile_2 = link[0][1]
@@ -172,6 +184,8 @@ class Individual(Component):
             comm = link[1]
             total_comm += comm * (abs(pos_1[0]-pos_2[0])+abs(pos_1[1]-pos_2[1]))
         self.total_comm = total_comm
+        # update unique hash
+        self.hash_label = self._get_unique_hash(self.position_list)
 
 class Candidate(Component):
     """

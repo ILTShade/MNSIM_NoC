@@ -141,6 +141,11 @@ class BaseArray(Component):
         file_name = f"output_info_{self.task_name_label}.txt"
         np.savetxt(file_name, output_list, fmt="%.3f")
         self.logger.info(f"The output info is saved in {file_name}")
+        # get min index
+        min_index = np.argsort(output_list[:, 1])[0]
+        self.logger.info(
+            f"The min index is {min_index}, and latency is {output_list[min_index, 1]}"
+        )
 
     def check_finish(self, tile_list, communication_list, wire_net):
         """
