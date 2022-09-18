@@ -222,10 +222,8 @@ class PresetMapping(Mapping):
     """
     NAME = "preset"
     def _get_position_list(self, tile_behavior_list):
-        file_name = os.path.join(
-            "/home/nfs_data/sunhanbo/heuristic_mapping/outputs",
-            "node_gnn_resnet18_search_process.pkl"
-        )
+        root_path = "/home/sunhanbo/nfs/mnsim_noc_date/configs"
+        file_name = os.path.join(root_path, f"{self.task_name_label}_{self._get_file_name()}.pkl")
         with open(file_name, "rb") as f:
             position_population = pickle.load(f)
         for position_list in position_population:
@@ -234,6 +232,24 @@ class PresetMapping(Mapping):
         self.logger.info(f"load from {file_name}")
         return [(None, position_list) for position_list in position_population]
 
+    def _get_file_name(self):
+        raise NotImplementedError
+
+class PresetBaselineMapping(PresetMapping):
+    """
+    preset baseline mapping
+    """
+    NAME = "preset_baseline"
+    def _get_file_name(self):
+        return "heuristic_baseline"
+
+class PresetNodeGroupMapping(PresetMapping):
+    """
+    preset node group mapping
+    """
+    NAME = "preset_node_group"
+    def _get_file_name(self):
+        return "ours"
 
 def _filter_individual(elite):
     """
@@ -302,7 +318,7 @@ class NodeGroup(Mapping):
             ])
             time_cost_list.append(end_time-start_time)
         # save to file
-        file_name = f"position_time_record_{self.task_name_label}_Ours.pkl"
+        file_name = f"position_time_record_{self.task_name_label}_ours.pkl"
         with open(file_name, "wb") as f:
             pickle.dump(save_position_list, f)
             pickle.dump(time_cost_list, f)
@@ -345,7 +361,7 @@ class HeuristicMapping(Mapping):
             probability = probability / probability.sum()
             crossover_pair = np.random.choice(
                 list(range(len(population))),
-                size=(len(population)//2, 2),
+                size=(len(population), 2),
                 p=probability
             ).tolist()
             crossover_population = [
@@ -379,4 +395,5 @@ class HeuristicMapping(Mapping):
         self.logger.info(f"save file to {file_name}")
         # output the best candidate
         # return population[0].position_list
-        return [output_position_list[-1]]
+        return output_position_list
+        # return [output_position_list[-1]]
