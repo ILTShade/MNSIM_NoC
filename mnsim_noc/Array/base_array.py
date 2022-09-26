@@ -136,7 +136,12 @@ class BaseArray(Component):
             self.check_finish(tile_list, communication_list, wire_net)
             # log info
             self.logger.info(f"For the {_}th: {fitness}, {time_point_list[-1]/1e6:.3f}")
-            # save for the output
+            # log communication amount
+            energy_bit = 5.445 + 0.43 # pJ / bit
+            total_transfer_bits = wire_net.get_communication_amounts()/1e6 # M bits
+            self.logger.info(f"Communication amounts: {total_transfer_bits:.2f} M bits")
+            self.logger.info(f"Energy consumption: {total_transfer_bits*energy_bit/1e3:.3f} mJ")
+        # save for the output
         output_list = np.array(output_list)
         file_name = f"output_info_{self.task_name_label}.txt"
         np.savetxt(file_name, output_list, fmt="%.3f")

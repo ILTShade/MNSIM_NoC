@@ -83,19 +83,19 @@ class BaseCommunication(Component):
             return True
         return False
 
-    def set_communication_task(self, current_time, trasnfer_path, transfer_time):
+    def set_communication_task(self, current_time, transfer_path, transfer_time):
         """
         transfer path can be None, means no communication
         """
-        assert trasnfer_path is not None
+        assert transfer_path is not None
         assert not self.running_state, f"communication should be idle"
         # PHASE COMMUNICATION START
         self.running_state = True
-        self.transfer_path = trasnfer_path
+        self.transfer_path = transfer_path
         # set buffer
         self.input_buffer.add_transfer_data_list(self.transfer_data, self.source_tile_id)
         self.output_buffer.delete_data_list(self.transfer_data, self.target_tile_id)
-        # get transfet time
+        # get transfer time
         self.communication_end_time = current_time + transfer_time
         self.communication_range_time.append((current_time, self.communication_end_time))
         # set wire state, in schedule

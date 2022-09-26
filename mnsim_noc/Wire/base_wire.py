@@ -76,3 +76,12 @@ class BaseWire(Component):
         for _, value in self.transfer_time_range.items():
             transfer_total_time += sum([end-start for start, end in value])
         return transfer_total_time * 1. / end_time
+
+    def get_communication_amounts(self):
+        """
+        get the communication amounts on the wire
+        """
+        transfer_total_amount = 0.
+        for _, value in self.transfer_time_range.items():
+            transfer_total_amount += sum([end-start for start, end in value])
+        return transfer_total_amount * self.band_width

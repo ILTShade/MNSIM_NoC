@@ -87,7 +87,7 @@ class WireNet(Component):
             # node a and node b are the two ends of the wire
             node_a = _get_position_key(wire_position[0])
             node_b = _get_position_key(wire_position[1])
-            # add to the adhacency dict
+            # add to the adjacency dict
             self.adjacency_dict[node_a] = self.adjacency_dict.get(node_a, []) + [node_b]
             self.adjacency_dict[node_b] = self.adjacency_dict.get(node_b, []) + [node_a]
             # add node a and node b to mapping
@@ -271,3 +271,12 @@ class WireNet(Component):
                 "range": wire_range,
             })
         return wire_range_list
+
+    def get_communication_amounts(self):
+        """
+        get communication amounts on all of the wire
+        """
+        communication_amounts = 0.
+        for wire in self.wires:
+            communication_amounts += wire.get_communication_amounts()
+        return communication_amounts
