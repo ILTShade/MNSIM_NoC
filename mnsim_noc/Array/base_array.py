@@ -141,6 +141,10 @@ class BaseArray(Component):
             total_transfer_bits = wire_net.get_communication_amounts()/1e6 # M bits
             self.logger.info(f"Communication amounts: {total_transfer_bits:.2f} M bits")
             self.logger.info(f"Energy consumption: {total_transfer_bits*energy_bit/1e3:.3f} mJ")
+            # get running rate for all wires
+            horizontal_rate, vertical_rate = wire_net.get_running_rate(time_point_list[-1])
+            rate_sum = np.sum(horizontal_rate) + np.sum(vertical_rate)
+            self.logger.info(f"total running rate: {rate_sum}")
         # save for the output
         output_list = np.array(output_list)
         file_name = f"output_info_{self.task_name_label}.txt"
