@@ -53,7 +53,7 @@ class MultiInputBuffer(Component):
 
     def _split_data_list(self, data_list):
         """
-        split data list regarding the inuput_source_id
+        split data list regarding the input_source_id
         """
         split_data_dict = dict()
         for data in data_list:

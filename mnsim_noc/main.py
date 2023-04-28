@@ -58,7 +58,7 @@ def main(config, task, mapping_strategy, schedule_strategy, transparent_flag):
             task_behavior_list.append(pickle.load(f))
         task_name_label.append(os.path.splitext(os.path.basename(task_config_path))[0])
     task_name_label = ",".join(task_name_label)
-    print(f"task name label: {task_name_label}")
+    # print(f"task name label: {task_name_label}")
     # create array
     array = BaseArray(
         task_name_label,

@@ -80,7 +80,7 @@ def test_communication():
         else:
             transfer_path = None
         communication_1.set_communication_task(current_time, transfer_path, 2.7)
-        # modfify current time
+        # modify current time
         current_time = min([
             tile_1.get_computation_end_time(),
             communication_1.get_communication_end_time(),

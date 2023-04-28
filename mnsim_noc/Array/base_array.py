@@ -27,6 +27,7 @@ class BaseArray(Component):
         self.task_name_label = task_name_label
         # logging
         self.logger.info("Initializing the array")
+        self.logger.info(f"\tThe task name label is {task_name_label}")
         self.logger.info(f"\tThere are {len(task_behavior_list)} tasks")
         for i, task_behavior in enumerate(task_behavior_list):
             self.logger.info(f"\t\tTask {i} need {len(task_behavior)} tiles")
@@ -63,32 +64,38 @@ class BaseArray(Component):
         """
         tile_number = []
         communication_number = []
-        behavior_number = []
+        computing_behavior_number = []
+        communication_behavior_number = []
         for _, task_behavior in enumerate(task_behavior_list):
             # for tile number
             tile_number.append(len(task_behavior))
             # for the communication number and behavior number
             task_communication_number = 0
-            task_behavior_number = 0
+            task_computing_behavior_number = 0
+            task_communication_behavior_number = 0
             for tile_behavior in task_behavior:
-                repeated_number = 1
+                task_computing_behavior_number += len(tile_behavior["dependence"])
                 if tile_behavior["target_tile_id"] != [-1]:
                     task_communication_number += len(tile_behavior["target_tile_id"])
-                    repeated_number += len(tile_behavior["target_tile_id"])
-                task_behavior_number += len(tile_behavior["dependence"]) * repeated_number
+                    task_communication_behavior_number += \
+                        len(tile_behavior["dependence"]) * \
+                        len(tile_behavior["target_tile_id"])
             communication_number.append(task_communication_number)
-            behavior_number.append(task_behavior_number)
+            computing_behavior_number.append(task_computing_behavior_number)
+            communication_behavior_number.append(task_communication_behavior_number)
         # logger
         self.logger.info(
             f"In total, {sum(tile_number)} tiles," + \
             f" {sum(communication_number)} communications," + \
-            f" {sum(behavior_number)} behaviors"
+            f" {sum(computing_behavior_number)} computing behaviors," + \
+            f" {sum(communication_behavior_number)} communication behaviors"
         )
         for i in range(len(task_behavior_list)):
             self.logger.info(
                 f"\tTask {i} has {tile_number[i]} tiles," + \
                 f" {communication_number[i]} communications," + \
-                f" {behavior_number[i]} behaviors"
+                f" {computing_behavior_number[i]} computing behaviors," + \
+                f" {communication_behavior_number[i]} communication behaviors"
             )
 
     def run(self):
