@@ -20,8 +20,8 @@ class BaseArray(Component):
     REGISTRY = "array"
     NAME = "behavior_driven"
     def __init__(self, task_name_label, task_behavior_list, image_num,
-        tile_net_shape, buffer_size, band_width,
-        mapping_strategy="naive", schedule_strategy="naive", transparent_flag=False
+        noc_topology, tile_net_shape, buffer_size, band_width,
+        path_generator, mapping_strategy="naive", schedule_strategy="naive", transparent_flag=False
     ):
         super(BaseArray, self).__init__()
         self.task_name_label = task_name_label
@@ -32,9 +32,11 @@ class BaseArray(Component):
         for i, task_behavior in enumerate(task_behavior_list):
             self.logger.info(f"\t\tTask {i} need {len(task_behavior)} tiles")
         self.logger.info(f"\tThe image number is {image_num}")
+        self.logger.info(f"\tThe noc topology is {noc_topology}")
         self.logger.info(f"\tThe tile net shape is {tile_net_shape}")
         self.logger.info(f"\tThe buffer size is {buffer_size}")
         self.logger.info(f"\tThe band width is {band_width}")
+        self.logger.info(f"\tThe path generator is {path_generator}")
         self.logger.info(
             f"\tStrategy are {mapping_strategy}, {schedule_strategy}, {transparent_flag}"
         )
@@ -42,7 +44,8 @@ class BaseArray(Component):
         self._get_behavior_number(task_behavior_list)
         # init
         self.mapping_strategy = Mapping.get_class_(mapping_strategy)(
-            task_name_label, task_behavior_list, image_num, tile_net_shape, buffer_size, band_width
+            task_name_label, task_behavior_list, image_num,\
+            noc_topology, tile_net_shape, buffer_size, band_width
         )
         # self.tile_list, self.communication_list, self.wire_net = \
         # self.mapping_strategy.mapping_net()
@@ -50,6 +53,7 @@ class BaseArray(Component):
         # set transparent
         self.transparent_flag = transparent_flag
         self.schedule_strategy = schedule_strategy
+        self.path_generator = path_generator
         # self.wire_net.set_transparent_flag(transparent_flag)
         # self.schedule_strategy = Schedule.get_class_(schedule_strategy)(
             # self.communication_list, self.wire_net
@@ -108,7 +112,7 @@ class BaseArray(Component):
             # init wire net and schedule
             wire_net.set_transparent_flag(self.transparent_flag)
             schedule_strategy = Schedule.get_class_(self.schedule_strategy)(
-                communication_list, wire_net
+                communication_list, wire_net, self.path_generator
             )
             # init current time and time point list
             current_time = 0.

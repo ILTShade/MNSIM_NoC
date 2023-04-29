@@ -36,7 +36,7 @@ class WireNet(Component):
     """
     REGISTRY = "wire_net"
     NAME = "behavior_driven"
-    def __init__(self, tile_net_shape, band_width):
+    def __init__(self, tile_net_shape, band_width, noc_topology):
         """
         wire net
         tile_net_shape: tuple -> (row_num, column_num)
@@ -55,21 +55,33 @@ class WireNet(Component):
         self.mapping_dict = {}
         self.cache_static_path = {}
         # horizontally wire as usual
+        assert noc_topology in ["mesh", "torus"], \
+            f"noc_topology: {noc_topology}, must be mesh or torus"
+        def _construct_add_wire(wire_position):
+            """
+            construct and add wire
+            """
+            wire = BaseWire(wire_position, band_width)
+            self.wires.append(wire)
+            self.wires_map[_get_map_key(wire_position)] = wire
+            self.wires_topology.append(wire_position)
         for i in range(tile_net_shape[0]):
             for j in range(tile_net_shape[1] - 1):
                 wire_position = ((i, j), (i, j + 1))
-                wire = BaseWire(wire_position, band_width)
-                self.wires.append(wire)
-                self.wires_map[_get_map_key(wire_position)] = wire
-                self.wires_topology.append(wire_position)
+                _construct_add_wire(wire_position)
+            # add for torus
+            if noc_topology == "torus":
+                wire_position = ((i, tile_net_shape[1] - 1), (i, 0))
+                _construct_add_wire(wire_position)
         # vertically wire as usual
         for j in range(tile_net_shape[1]):
             for i in range(tile_net_shape[0] - 1):
                 wire_position = ((i, j), (i + 1, j))
-                wire = BaseWire(wire_position, band_width)
-                self.wires.append(wire)
-                self.wires_map[_get_map_key(wire_position)] = wire
-                self.wires_topology.append(wire_position)
+                _construct_add_wire(wire_position)
+            # add for torus
+            if noc_topology == "torus":
+                wire_position = ((tile_net_shape[0] - 1, j), (0, j))
+                _construct_add_wire(wire_position)
         self.transparent_flag = False
         # init adjacency dict
         # IT SHOULD BE NOTICED THAT
@@ -123,7 +135,38 @@ class WireNet(Component):
             self.adjacency_dict[node_b].append(node_a)
         return None
 
-    def find_data_path(self, start_position, end_position, dynamic_flag):
+    def _xy_data_path(self, start_position, end_position):
+        """
+        find the data path from start_position to end_position based on X-Y routing
+        without crossing the border
+        start_position: tuple -> (row_index, column_index)
+        end_position: tuple -> (row_index, column_index)
+        """
+        path = [start_position]
+        current_position = start_position
+        # for y index
+        while True:
+            if current_position[1] == end_position[1]:
+                break
+            if current_position[1] < end_position[1]:
+                shift = 1
+            else:
+                shift = -1
+            current_position = (current_position[0], current_position[1] + shift)
+            path.append(current_position)
+        # for x index
+        while True:
+            if current_position[0] == end_position[0]:
+                break
+            if current_position[0] < end_position[0]:
+                shift = 1
+            else:
+                shift = -1
+            current_position = (current_position[0] + shift, current_position[1])
+            path.append(current_position)
+        return [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+
+    def _find_data_path(self, start_position, end_position, dynamic_flag):
         """
         find the data path from start_position to end_position
         start_position: tuple -> (row_index, column_index)
@@ -192,6 +235,26 @@ class WireNet(Component):
         assert output_path is not None, f"output_path should not be None"
         self.cache_static_path[cache_key] = output_path
         return self.cache_static_path[cache_key]
+
+    def find_data_path_cate(self, start_position, end_position, cate):
+        """
+        find the data path from start_position to end_position_list
+        start_position: tuple -> (row_index, column_index)
+        end_position: tuple -> (row_index, column_index)
+        cate: str -> different path generator, "naive", "adaptive"
+        """
+        # this function is the decorator of _find_data_path function
+        # find_data_path_cate(start, end, "naive") is equal to X-Y routing in mesh
+        # find_data_path_cate(start, end, "adaptive") is equal to _find_data_path(start, end, False)
+        # find_data_path_cate(start, end, "dijkstra") is equal to _find_data_path(start, end, True)
+        if cate == "naive":
+            return self._xy_data_path(start_position, end_position)
+        elif cate == "adaptive":
+            return self._find_data_path(start_position, end_position, False)
+        elif cate == "dijkstra":
+            return self._find_data_path(start_position, end_position, True)
+        else:
+            raise ValueError(f"cate should be naive, adaptive or dijkstra, but get {cate}")
 
     def set_transparent_flag(self, transparent_flag):
         """

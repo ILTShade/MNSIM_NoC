@@ -18,10 +18,16 @@ class Schedule(Component):
     schedule class for behavior-driven simulation
     """
     REGISTRY = "schedule"
-    def __init__(self, communication_list, wire_net):
+    def __init__(self, communication_list, wire_net, path_generator):
         super(Schedule, self).__init__()
         self.communication_list = communication_list
         self.wire_net = wire_net
+        self.path_generator = path_generator
+        # naive for X-Y without through the border
+        # adaptive for X-Y with through the border when torus
+        # when the noc topology is mesh, there should be no diff in naive and adaptive
+        assert self.path_generator in ["naive", "adaptive", "dijkstra"], \
+            "path generator should be naive, adaptive, dijkstra"
         # init hyper parameter
         self.max_len_ratio = 1.8
         self.branch_preset = 2
@@ -99,7 +105,12 @@ class NaiveSchedule(Schedule):
         start_position = self.communication_list[communication_id].input_tile.position
         end_position = self.communication_list[communication_id].output_tile.position
         assert start_position != end_position, "start position and end position are the same"
-        transfer_path = self.wire_net.find_data_path(start_position, end_position, False)
+        # find path base on the path generator
+        transfer_path = self.wire_net.find_data_path_cate(
+            start_position, end_position, self.path_generator
+        )
+        if transfer_path is None:
+            return False, None
         transfer_path_flag = not self.wire_net.get_data_path_state(transfer_path)
         return transfer_path_flag, transfer_path
 
@@ -134,18 +145,25 @@ class DynamicPathSchedule(NaiveSchedule):
         start_position = self.communication_list[communication_id].input_tile.position
         end_position = self.communication_list[communication_id].output_tile.position
         assert start_position != end_position, "start position and end position are the same"
-        transfer_path = self.wire_net.find_data_path(start_position, end_position, True)
-        # check the transfer path length
+        transfer_path = self.wire_net.find_data_path_cate(
+            start_position, end_position, self.path_generator
+        )
+        # check if there are transfer path
         if transfer_path is None:
             return False, None
-        naive_path = self.wire_net.find_data_path(start_position, end_position, False)
+        # check for if the path is valid
+        transfer_path_flag = not self.wire_net.get_data_path_state(transfer_path)
+        if not transfer_path_flag:
+            return transfer_path_flag, transfer_path
+        # check for the path length, adaptive is the base
+        naive_path = self.wire_net.find_data_path_cate(
+            start_position, end_position, "adaptive"
+        )
         max_path_len = math.floor(max(
             self.max_len_ratio * len(naive_path), # ratio for time
             len(naive_path) + self.branch_preset # branch for start node and end node
         ))
-        transfer_path = transfer_path if len(transfer_path) <= max_path_len else None
-        # return the output
-        return transfer_path is not None, transfer_path
+        return len(transfer_path) <= max_path_len, transfer_path
 
 class DynamicAllSchedule(DynamicPrioritySchedule, DynamicPathSchedule):
     """

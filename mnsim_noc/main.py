@@ -30,6 +30,7 @@ def main(config, task, mapping_strategy, schedule_strategy, transparent_flag):
     array_config = read_yaml(config)
     # load array config
     image_num = array_config.get("image_num", 1)
+    noc_topology = array_config.get("noc_topology", "mesh")
     tile_net_shape = (
         array_config.get("tile_array_row", 16),
         array_config.get("tile_array_col", 16)
@@ -37,8 +38,9 @@ def main(config, task, mapping_strategy, schedule_strategy, transparent_flag):
     buffer_size = (
         array_config.get("input_buffer_size", 822400),
         array_config.get("output_buffer_size", 822400)
-    ) # default 32768 bits, 4KB
+    ) # default 822400 bits
     band_width = array_config.get("band_width", 1) # default, 1Gbps
+    path_generator = array_config.get("path_generator", "naive")
     mapping_strategy = array_config.get("mapping_strategy", "naive") \
         if mapping_strategy is None else mapping_strategy
     schedule_strategy = array_config.get("schedule_strategy", "naive") \
@@ -63,8 +65,8 @@ def main(config, task, mapping_strategy, schedule_strategy, transparent_flag):
     array = BaseArray(
         task_name_label,
         task_behavior_list, image_num,
-        tile_net_shape, buffer_size, band_width,
-        mapping_strategy, schedule_strategy, transparent_flag
+        noc_topology, tile_net_shape, buffer_size, band_width,
+        path_generator, mapping_strategy, schedule_strategy, transparent_flag
     )
     # array run and show config
     array.run()

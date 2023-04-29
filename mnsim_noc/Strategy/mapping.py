@@ -28,12 +28,13 @@ class Mapping(Component):
     """
     REGISTRY = "mapping"
     def __init__(self, task_name_label, task_behavior_list, image_num,
-        tile_net_shape, buffer_size, band_width
+        noc_topology, tile_net_shape, buffer_size, band_width
     ):
         super(Mapping, self).__init__()
         self.task_name_label = task_name_label
         self.task_behavior_list = task_behavior_list
         self.image_num = image_num
+        self.noc_topology = noc_topology
         self.tile_row = tile_net_shape[0]
         self.tile_column = tile_net_shape[1]
         self.buffer_size = buffer_size
@@ -113,8 +114,10 @@ class Mapping(Component):
             for position, tile_behavior in zip(position_list, tile_behavior_list):
                 tile = BaseTile(position, self.image_num, self.buffer_size, tile_behavior)
                 tile_list.append(tile)
-            # get wire net
-            wire_net = WireNet((self.tile_row, self.tile_column), self.band_width)
+            # get wire net based on the noc topology
+            wire_net = WireNet(
+                (self.tile_row, self.tile_column), self.band_width, self.noc_topology
+            )
             # communication list
             communication_list = []
             for start_tile in tile_list:

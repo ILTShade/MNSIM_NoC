@@ -19,7 +19,9 @@ from mnsim_noc.utils.yaml_io import read_yaml
 
 
 @pytest.mark.parametrize("config, task", [("examples/test.yaml", "examples/test.pkl")])
-def test_schedule(config, task):
+@pytest.mark.parametrize("noc_topology", ["mesh", "torus"])
+@pytest.mark.parametrize("path_generator", ["naive", "adaptive", "dijkstra"])
+def test_schedule(config, task, noc_topology, path_generator):
     """
     test schedule step for each communication
     """
@@ -47,15 +49,17 @@ def test_schedule(config, task):
     array = BaseArray(
         task_name_label,
         task_behavior_list, image_num,
-        tile_net_shape, buffer_size, band_width,
-        mapping_strategy, schedule_strategy, transparent_flag
+        noc_topology, tile_net_shape, buffer_size, band_width,
+        path_generator, mapping_strategy, schedule_strategy, transparent_flag
     )
     # init schedule
     assert len(array.output_behavior_list) == 1, \
         f"output behavior list is {array.output_behavior_list}"
     _, _, communication_list, wire_net = array.output_behavior_list[0]
     wire_net.set_transparent_flag(transparent_flag)
-    schedule_strategy = Schedule.get_class_(schedule_strategy)(communication_list, wire_net)
+    schedule_strategy = Schedule.get_class_(schedule_strategy)(
+        communication_list, wire_net, path_generator
+    )
     # base test for the schedule strategy
     # for communication in communication_list:
     #     print(communication.input_tile.position, communication.output_tile.position)
@@ -70,7 +74,12 @@ def test_schedule(config, task):
     path_flag, transfer_path = schedule_strategy._find_check_path(communication_id)
     print(f"test case 1: {path_flag}, {transfer_path}")
     # test case 2
-    occupy_path = [((0,1),(0,0))]
+    occupy_path = [((0,0),(0,1))]
     wire_net.set_data_path_state(occupy_path, True, communication_id, 0.)
     path_flag, transfer_path = schedule_strategy._find_check_path(communication_id)
     print(f"test case 2: {path_flag}, {transfer_path}")
+    # test case 3
+    occupy_path = [((2,0),(2,1))]
+    wire_net.set_data_path_state(occupy_path, True, communication_id, 0.)
+    path_flag, transfer_path = schedule_strategy._find_check_path(communication_id)
+    print(f"test case 3: {path_flag}, {transfer_path}")
