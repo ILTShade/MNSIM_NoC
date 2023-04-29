@@ -140,8 +140,10 @@ def test_array():
     # import pickle
     # with open("tmp.pkl", "wb") as f:
     #     pickle.dump(get_test_config()[0], f)
-    array = BaseArray(get_test_config(), 2, (3, 3), (4096, 4096), 1,
-        mapping_strategy="snake", transparent_flag=True
+    array = BaseArray(
+        "test",
+        get_test_config(), 2,
+        "mesh", (3, 3), (4096, 4096), 1,
+        "naive", mapping_strategy="snake", transparent_flag=True
     )
     array.run()
-    array.show_simulation_result()

@@ -15,5 +15,5 @@ def test_wire():
     """
     test wire net class
     """
-    wire_net = WireNet((2, 2), 1)
+    wire_net = WireNet((2, 2), 1, "mesh")
     wire_net.set_transparent_flag(True)

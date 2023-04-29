@@ -64,7 +64,7 @@ def test_communication():
     }
     tile_2 = BaseTile((0, 1), 2, (4096, 4096), tile_behavior_cfg_2)
     # wire net
-    wire_net = WireNet((2, 2), 10)
+    wire_net = WireNet((2, 2), 10, "mesh")
     # for communication
     communication_1 = BaseCommunication(tile_1, tile_2, wire_net)
     # check
@@ -77,9 +77,9 @@ def test_communication():
         # map communication schedule
         if communication_1.check_communication_ready():
             transfer_path = [((0, 0), (0, 1))]
+            communication_1.set_communication_task(current_time, transfer_path, 2.7)
         else:
             transfer_path = None
-        communication_1.set_communication_task(current_time, transfer_path, 2.7)
         # modify current time
         current_time = min([
             tile_1.get_computation_end_time(),
