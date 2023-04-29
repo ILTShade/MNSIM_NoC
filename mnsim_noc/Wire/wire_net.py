@@ -42,7 +42,8 @@ class WireNet(Component):
         tile_net_shape: tuple -> (row_num, column_num)
         """
         super(WireNet, self).__init__()
-        # init wire net
+        # init wire net, list and dict of wires
+        # the same instances, different references
         self.tile_net_shape = tile_net_shape
         self.wires = []
         self.wires_map = {}
@@ -50,6 +51,7 @@ class WireNet(Component):
         self.wires_topology = []
         self.adjacency_dict = {}
         self.origin_adjacency_dict = {} # the base adjacency dict, will NOT change
+        # mapping dict and cache static path to accelerate
         self.mapping_dict = {}
         self.cache_static_path = {}
         # horizontally wire as usual
@@ -183,7 +185,7 @@ class WireNet(Component):
                 if current_node == start_node:
                     break
                 current_node = all_node_info[current_node][1]
-            output_path = [(path[i], path[i+1]) for i in range(len(path)-1)] # get wire path
+            output_path = [(path[-1-i], path[-2-i]) for i in range(len(path)-1)] # get wire path
         # for dynamic and static, the output is different
         if dynamic_flag is True:
             return output_path
