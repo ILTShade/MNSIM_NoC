@@ -9,10 +9,14 @@
 """
 import os
 import pickle
+from line_profiler import LineProfiler
 
 import click
 
 from mnsim_noc.Array import BaseArray
+from mnsim_noc.Strategy.schedule import Schedule
+from mnsim_noc.Tile.base_tile import BaseTile
+from mnsim_noc.Communication.base_communication import BaseCommunication
 from mnsim_noc.utils.yaml_io import read_yaml
 
 
@@ -22,7 +26,8 @@ from mnsim_noc.utils.yaml_io import read_yaml
 @click.option("--mapping_strategy", "-M", type=str, help="mapping strategy")
 @click.option("--schedule_strategy", "-S", type=str, help="schedule strategy")
 @click.option("--transparent_flag", "-T", is_flag=True, default=False, help="transparent mode")
-def main(config, task, mapping_strategy, schedule_strategy, transparent_flag):
+@click.option("--profile_flag", "-P", is_flag=True, default=False, help="profile mode")
+def main(config, task, mapping_strategy, schedule_strategy, transparent_flag, profile_flag):
     """
     main function
     """
@@ -69,4 +74,17 @@ def main(config, task, mapping_strategy, schedule_strategy, transparent_flag):
         path_generator, mapping_strategy, schedule_strategy, transparent_flag
     )
     # array run and show config
-    array.run()
+    if not profile_flag:
+        array.run()
+    else:
+        lp = LineProfiler()
+        # main function for profiling, schedule and update
+        lp.add_function(Schedule.schedule)
+        lp.add_function(Schedule.get_class_(schedule_strategy)._get_transfer_path_list)
+        lp.add_function(Schedule.get_class_(schedule_strategy)._find_check_path)
+        lp.add_function(BaseTile.update)
+        lp.add_function(BaseCommunication.update)
+        # array run
+        lp_wrapper = lp(array.run)
+        lp_wrapper()
+        lp.print_stats()
