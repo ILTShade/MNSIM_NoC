@@ -44,16 +44,17 @@ class Schedule(Component):
         """
         raise NotImplementedError
 
-    def schedule(self, current_time):
+    def schedule(self, current_time, communication_schedule_flag):
         """
         schedule the communication
         """
-        # get communication flag
-        communication_ready_flag = [communication.check_communication_ready()
-            for communication in self.communication_list
+        # get communication flag, filter by schedule flag
+        communication_ready_flag = [
+            self.communication_list[comm_id].check_communication_ready() if schedule_flag else False
+            for comm_id, schedule_flag in enumerate(communication_schedule_flag)
         ]
         # schedule and start communication
-        self._get_transfer_path_list(communication_ready_flag, current_time)
+        return self._get_transfer_path_list(communication_ready_flag, current_time)
 
 class NaiveSchedule(Schedule):
     """
@@ -73,6 +74,8 @@ class NaiveSchedule(Schedule):
         # get sorted index and fused into communication ready flag
         sorted_index = self._get_sorted_index()
         sorted_index = list(filter(lambda x: communication_ready_flag[x], sorted_index))
+        # output the task_comm_id_list
+        task_comm_id_list = []
         # JUDGE
         for index in sorted_index:
             path_flag, transfer_path = self._find_check_path(index)
@@ -87,6 +90,9 @@ class NaiveSchedule(Schedule):
                 self.communication_list[index].set_communication_task(
                     current_time, transfer_path_list[index], transfer_time_list[index]
                 )
+                # add to list
+                task_comm_id_list.append(index)
+        return task_comm_id_list
 
     def _get_sorted_index(self):
         """

@@ -117,24 +117,76 @@ class BaseArray(Component):
             # init current time and time point list
             current_time = 0.
             time_point_list = []
-            update_module = self.mapping_strategy.get_update_order(
-                tile_list, communication_list
-            )
+            # get the adjacency list saved in predecessors and successors
+            tile_predecessors, tile_successors, comm_predecessors, comm_successors = \
+                self.mapping_strategy.get_adjacency_list(
+                    tile_list, communication_list
+                )
+            # record all the communication end time in the original order
+            communication_end_time_list = [float("inf")] * len(communication_list)
+            communication_schedule_flag = [False] * len(communication_list)
+            # record all tile flag
+            tile_end_time_list = [float("inf")] * len(tile_list)
+            tile_update_flag = [False] * len(tile_list)
+            # the start buffer should be set to true
+            for tile_id, tile in enumerate(tile_list):
+                if tile.input_buffer.start_flag:
+                    tile_update_flag[tile_id] = True
             start_time = time.time()
             while True:
-                # running the data
-                for module in update_module:
-                    module.update(current_time)
+                # running the data in the optimal order
+                # first, update part of the communication which can be done in current time
+                for comm_id, comm_end_time in enumerate(communication_end_time_list):
+                    if comm_end_time <= current_time:
+                        # 1.1 update the communication, and end time
+                        communication_list[comm_id].update(current_time)
+                        communication_end_time_list[comm_id] = \
+                            communication_list[comm_id].get_communication_end_time()
+                        # 1.2 add to the schedule flag list
+                        communication_schedule_flag[comm_id] = True
+                        # 1.3 set successors tile update flag
+                        for tile_id in comm_successors[comm_id]:
+                            tile_update_flag[tile_id] = True
+                # second, update part of the tile which can be done in current time
+                for tile_id, tile_end_time in enumerate(tile_end_time_list):
+                    if tile_end_time <= current_time:
+                        # 2.1 add to the update flag list
+                        tile_update_flag[tile_id] = True
+                        # 2.2 set predecessors and successors comm schedule flag
+                        for comm_id in tile_predecessors[tile_id]:
+                            communication_schedule_flag[comm_id] = True
+                        for comm_id in tile_successors[tile_id]:
+                            communication_schedule_flag[comm_id] = True
+                # third, update based on the update flag
+                # achieve no redundant update
+                for tile_id, tile_update in enumerate(tile_update_flag):
+                    if tile_update:
+                        # 3.1 update the tile
+                        tile_list[tile_id].update(current_time)
+                        # 3.2 update the end tile
+                        tile_end_time_list[tile_id] = tile_list[tile_id].get_computation_end_time()
+                        # 3.3 update the update flag, only update only state changes
+                        tile_update_flag[tile_id] = False
+
                 # schedule for the path
-                schedule_strategy.schedule(current_time)
+                task_comm_id_list = \
+                    schedule_strategy.schedule(current_time, communication_schedule_flag)
+                # fourth, update the communication which is set tasks
+                for comm_id in task_comm_id_list:
+                    # 4.1 update the communication end time
+                    communication_end_time_list[comm_id] = \
+                        communication_list[comm_id].get_communication_end_time()
+                    # 4.2 set the update flag of the tile successors as True
+                    for tile_id in comm_predecessors[comm_id]:
+                        tile_update_flag[tile_id] = True
+                # 4.3 set the communication schedule flag as False if in running or done
+                for comm_id, comm in enumerate(communication_list):
+                    if comm.running_state or \
+                        comm.number_done_communication == comm.number_total_communication:
+                        communication_schedule_flag[comm_id] = False
+
                 # get next time
-                next_time = min([
-                    min([tile.get_computation_end_time() for tile in tile_list]),
-                    min([
-                        communication.get_communication_end_time()
-                        for communication in communication_list
-                    ])
-                ])
+                next_time = min(min(tile_end_time_list), min(communication_end_time_list))
                 # check if the simulation is over
                 assert next_time > current_time
                 current_time = next_time

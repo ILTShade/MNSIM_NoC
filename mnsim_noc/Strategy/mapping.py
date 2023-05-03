@@ -134,28 +134,29 @@ class Mapping(Component):
         # return tile_list, communication_list, wire_net
         return output_behavior_list
 
-    def get_update_order(self, tile_list, communication_list):
+    def get_adjacency_list(self, tile_list, communication_list):
         """
-        get update order, first write the read
+        get the adjacency list
+        output: tile_predecessors, tile_successors, comm_predecessors, comm_successors
+        all outputs are list of list
         """
-        update_module = []
-        communication_in_ids = []
-        for tile in tile_list:
-            # first, communication output tile is this tile
-            for communication in communication_list:
-                if communication.output_tile is tile and \
-                    id(communication) not in communication_in_ids:
-                    communication_in_ids.append(id(communication))
-                    update_module.append(communication)
-            # this tile
-            update_module.append(tile)
-            # last for the communication input tile is this tile
-            for communication in communication_list:
-                if communication.input_tile is tile and \
-                    id(communication) not in communication_in_ids:
-                    communication_in_ids.append(id(communication))
-                    update_module.append(communication)
-        return update_module
+        tile_len = len(tile_list)
+        comm_len = len(communication_list)
+        tile_predecessors = [[] for _ in range(tile_len)]
+        tile_successors = [[] for _ in range(tile_len)]
+        comm_predecessors = [[] for _ in range(comm_len)]
+        comm_successors = [[] for _ in range(comm_len)]
+        for i, tile in enumerate(tile_list):
+            for j, comm in enumerate(communication_list):
+                if comm.input_tile == tile:
+                    tile_successors[i].append(j)
+                    comm_predecessors[j].append(i)
+                elif comm.output_tile == tile:
+                    tile_predecessors[i].append(j)
+                    comm_successors[j].append(i)
+                else:
+                    pass
+        return tile_predecessors, tile_successors, comm_predecessors, comm_successors
 
 class NaiveMapping(Mapping):
     """
