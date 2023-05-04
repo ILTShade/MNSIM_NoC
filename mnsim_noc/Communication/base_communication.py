@@ -98,6 +98,11 @@ class BaseCommunication(Component):
         # get transfer time
         self.communication_end_time = current_time + transfer_time
         self.communication_range_time.append((current_time, self.communication_end_time))
+        # assert the path is valid
+        assert self.transfer_path[0][0] == self.input_tile.position
+        assert self.transfer_path[-1][-1] == self.output_tile.position
+        for i in range(len(self.transfer_path) - 1):
+            assert self.transfer_path[i][1] == self.transfer_path[i + 1][0]
         # set wire state, in schedule
         self.wire_net.set_data_path_state(
             self.transfer_path, True, self.communication_id, current_time
