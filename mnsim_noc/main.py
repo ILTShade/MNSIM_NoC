@@ -27,7 +27,12 @@ from mnsim_noc.utils.yaml_io import read_yaml
 @click.option("--schedule_strategy", "-S", type=str, help="schedule strategy")
 @click.option("--transparent_flag", "-T", is_flag=True, default=False, help="transparent mode")
 @click.option("--profile_flag", "-P", is_flag=True, default=False, help="profile mode")
-def main(config, task, mapping_strategy, schedule_strategy, transparent_flag, profile_flag):
+@click.option("--path_generator", "-G", type=str, help="path generator")
+def main(
+    config,
+    task, mapping_strategy, schedule_strategy, transparent_flag,
+    profile_flag, path_generator
+    ):
     """
     main function
     """
@@ -45,13 +50,14 @@ def main(config, task, mapping_strategy, schedule_strategy, transparent_flag, pr
         array_config.get("output_buffer_size", 822400)
     ) # default 822400 bits
     band_width = array_config.get("band_width", 1) # default, 1Gbps
-    path_generator = array_config.get("path_generator", "naive")
     mapping_strategy = array_config.get("mapping_strategy", "naive") \
         if mapping_strategy is None else mapping_strategy
     schedule_strategy = array_config.get("schedule_strategy", "naive") \
         if schedule_strategy is None else schedule_strategy
     transparent_flag = array_config.get("transparent_flag", False) \
         if transparent_flag is None else transparent_flag
+    path_generator = array_config.get("path_generator", "naive") \
+        if path_generator is None else path_generator
     # override config
     # load task config behavior list
     task_config_path_list = array_config.get("task_config_path_list", []) \
@@ -71,7 +77,8 @@ def main(config, task, mapping_strategy, schedule_strategy, transparent_flag, pr
         task_name_label,
         task_behavior_list, image_num,
         noc_topology, tile_net_shape, buffer_size, band_width,
-        path_generator, mapping_strategy, schedule_strategy, transparent_flag
+        mapping_strategy, schedule_strategy, transparent_flag,
+        path_generator
     )
     # array run and show config
     if not profile_flag:

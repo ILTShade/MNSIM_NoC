@@ -8,8 +8,8 @@
     2021/10/08 18:21
 """
 import time
-# import numpy as np
 import bisect
+import numpy as np
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Strategy.mapping import Mapping
 from mnsim_noc.Strategy.schedule import Schedule
@@ -22,7 +22,8 @@ class BaseArray(Component):
     NAME = "behavior_driven"
     def __init__(self, task_name_label, task_behavior_list, image_num,
         noc_topology, tile_net_shape, buffer_size, band_width,
-        path_generator, mapping_strategy="naive", schedule_strategy="naive", transparent_flag=False
+        mapping_strategy="naive", schedule_strategy="naive", transparent_flag=False,
+        path_generator="naive"
     ):
         super(BaseArray, self).__init__()
         self.task_name_label = task_name_label
@@ -37,10 +38,10 @@ class BaseArray(Component):
         self.logger.info(f"\tThe tile net shape is {tile_net_shape}")
         self.logger.info(f"\tThe buffer size is {buffer_size}")
         self.logger.info(f"\tThe band width is {band_width}")
-        self.logger.info(f"\tThe path generator is {path_generator}")
         self.logger.info(
             f"\tStrategy are {mapping_strategy}, {schedule_strategy}, {transparent_flag}"
         )
+        self.logger.info(f"\tThe path generator is {path_generator}")
         # show the array
         self._get_behavior_number(task_behavior_list)
         # init
@@ -237,10 +238,10 @@ class BaseArray(Component):
             # rate_sum = np.sum(horizontal_rate) + np.sum(vertical_rate)
             # self.logger.info(f"total running rate: {rate_sum}")
         # save for the output
-        # output_list = np.array(output_list)
-        # file_name = f"output_info_{self.task_name_label}.txt"
-        # np.savetxt(file_name, output_list, fmt="%.3f")
-        # self.logger.info(f"The output info is saved in {file_name}")
+        output_list = np.array(output_list)
+        file_name = f"output_info_{self.task_name_label}.txt"
+        np.savetxt(file_name, output_list, fmt="%.3f")
+        self.logger.info(f"The output info is saved in {file_name}")
         # get min index
         # min_index = np.argsort(output_list[:, 1])[0]
         # self.logger.info(
