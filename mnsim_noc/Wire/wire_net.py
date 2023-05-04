@@ -135,36 +135,119 @@ class WireNet(Component):
             self.adjacency_dict[node_b].append(node_a)
         return None
 
-    def _xy_data_path(self, start_position, end_position):
+    def _xy_routing_path(self, start_position, end_position, order="row"):
         """
         find the data path from start_position to end_position based on X-Y routing
         without crossing the border
         start_position: tuple -> (row_index, column_index)
         end_position: tuple -> (row_index, column_index)
         """
+        # row for in X dimension first, and Y dimension second
+        # col for in Y dimension first, and X dimension second
+        if order == "row":
+            # in each element, the first is the index of the position
+            # and the second is the shift
+            operations = [(1, (0, 1)), (0, (1, 0))]
+        elif order == "col":
+            operations = [(0, (1, 0)), (1, (0, 1))]
+        else:
+            raise ValueError(f"order: {order}, must be row or col")
+        # find the path based on the operations
         path = [start_position]
         current_position = start_position
-        # for y index
-        while True:
-            if current_position[1] == end_position[1]:
-                break
-            if current_position[1] < end_position[1]:
-                shift = 1
-            else:
-                shift = -1
-            current_position = (current_position[0], current_position[1] + shift)
-            path.append(current_position)
-        # for x index
-        while True:
-            if current_position[0] == end_position[0]:
-                break
-            if current_position[0] < end_position[0]:
-                shift = 1
-            else:
-                shift = -1
-            current_position = (current_position[0] + shift, current_position[1])
-            path.append(current_position)
+        for index, shift in operations:
+            # first, set the shift
+            if end_position[index] == current_position[index]:
+                continue
+            if end_position[index] < current_position[index]:
+                shift = (-shift[0], -shift[1])
+            while True:
+                current_position = (current_position[0] + shift[0], current_position[1] + shift[1])
+                path.append(current_position)
+                if current_position[index] == end_position[index]:
+                    break
         return [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+
+    def _winding_routing_path(self, start_position, end_position, order="row"):
+        """
+        find the data path from start_position to end_position based on winding routing
+        without crossing the border
+        start_position: tuple -> (row_index, column_index)
+        end_position: tuple -> (row_index, column_index)
+        """
+        operations = [(1, (0, 1)), (0, (1, 0))] # base operations
+        if order == "row":
+            choice = 1 - 0
+        elif order == "col":
+            choice = 1 - 1
+        else:
+            raise ValueError(f"order: {order}, must be row or col")
+        # find the path based on the operations and choice
+        # change for one to each other
+        path = [start_position]
+        path_length_list = []
+        current_position = start_position
+        while True:
+            choice = 1 - choice
+            # initialize the path length list
+            path_length_list.append(len(path))
+            if len(path_length_list) >= 3 and \
+                path_length_list[-1] == path_length_list[-2] == path_length_list[-3]:
+                # if the path length is not changed for three times, stop
+                break
+            # first, get the index and shift
+            index, shift = operations[choice]
+            if end_position[index] == current_position[index]:
+                # change the choice
+                continue
+            if end_position[index] < current_position[index]:
+                # change the shift
+                shift = (-shift[0], -shift[1])
+            while True:
+                next_position = (current_position[0] + shift[0], current_position[1] + shift[1])
+                state = self.wires_map[
+                    _get_map_key((current_position, next_position))
+                ].get_wire_state()
+                if state:
+                    # change the choice
+                    break
+                current_position = next_position
+                path.append(current_position)
+                if current_position[index] == end_position[index]:
+                    break
+        # check if can find the path
+        if path[-1] == end_position:
+            return [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+        return None
+
+    def _west_first_routing_path(self, start_position, end_position):
+        """
+        find the data path based on west first routing
+        """
+        # end on the left of the start
+        if end_position[1] <= start_position[1]:
+            return self._xy_routing_path(start_position, end_position, order="row")
+        return self._winding_routing_path(start_position, end_position, order="row")
+
+    def _north_last_routing_path(self, start_position, end_position):
+        """
+        find the data path based on north last routing
+        """
+        # end on the top of the start
+        if end_position[0] <= start_position[0]:
+            return self._xy_routing_path(start_position, end_position, order="row")
+        return self._winding_routing_path(start_position, end_position, order="row")
+
+    def _negative_first_routing_path(self, start_position, end_position):
+        """
+        find the data path based on negative first routing
+        """
+        # end on the left of the start
+        if end_position[0] <= start_position[0] and end_position[1] <= start_position[1]:
+            return self._xy_routing_path(start_position, end_position, order="row")
+        if end_position[0] > start_position[0] and end_position[1] > start_position[1]:
+            return self._xy_routing_path(start_position, end_position, order="col")
+        return self._winding_routing_path(start_position, end_position, order="row")
 
     def _find_data_path(self, start_position, end_position, dynamic_flag):
         """
@@ -248,13 +331,18 @@ class WireNet(Component):
         # find_data_path_cate(start, end, "adaptive") is equal to _find_data_path(start, end, False)
         # find_data_path_cate(start, end, "dijkstra") is equal to _find_data_path(start, end, True)
         if cate == "naive":
-            return self._xy_data_path(start_position, end_position)
-        elif cate == "adaptive":
+            return self._xy_routing_path(start_position, end_position, "row")
+        if cate == "west_first":
+            return self._west_first_routing_path(start_position, end_position)
+        if cate == "north_last":
+            return self._north_last_routing_path(start_position, end_position)
+        if cate == "negative_first":
+            return self._negative_first_routing_path(start_position, end_position)
+        if cate == "adaptive":
             return self._find_data_path(start_position, end_position, False)
-        elif cate == "dijkstra":
+        if cate == "dijkstra":
             return self._find_data_path(start_position, end_position, True)
-        else:
-            raise ValueError(f"cate should be naive, adaptive or dijkstra, but get {cate}")
+        raise ValueError(f"cate should be naive, adaptive or dijkstra, but get {cate}")
 
     def set_transparent_flag(self, transparent_flag):
         """
