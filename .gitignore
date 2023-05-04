@@ -130,3 +130,6 @@ datas/
 # bash
 *.sh
 already/
+ 
+# output info
+output_info_*.txt
