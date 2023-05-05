@@ -26,8 +26,8 @@ class Schedule(Component):
         # naive for X-Y without through the border
         # adaptive for X-Y with through the border when torus
         # when the noc topology is mesh, there should be no diff in naive and adaptive
-        assert self.path_generator in ["naive", "adaptive", "dijkstra"], \
-            "path generator should be naive, adaptive, dijkstra"
+        # assert self.path_generator in ["naive", "adaptive", "dijkstra"], \
+            # "path generator should be naive, adaptive, dijkstra"
         # init hyper parameter
         self.max_len_ratio = 1.8
         self.branch_preset = 2

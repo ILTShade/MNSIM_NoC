@@ -10,9 +10,13 @@
     2022/05/07 17:20
 """
 import copy
+from queue import PriorityQueue
+
 import numpy as np
+
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Wire.base_wire import BaseWire
+
 
 def _get_map_key(wire_position):
     """
@@ -29,6 +33,45 @@ def _get_position_key(tile_position):
     str the tile position like: (0, 0)
     """
     return str(tile_position)
+
+def _mesh_heuristic(x_dis, _, y_dis, __):
+    """
+    mesh heuristic
+    """
+    return x_dis + y_dis
+
+def _torus_heuristic(x_dis, x_len, y_dis, y_len):
+    """
+    torus heuristic
+    """
+    return min(x_dis, x_len - x_dis) + min(y_dis, y_len - y_dis)
+
+class _MyPriorityQueue(PriorityQueue):
+    """
+    add a counter to the PriorityQueue
+    """
+    def __init__(self, *args, **kwargs):
+        super(_MyPriorityQueue, self).__init__(*args, **kwargs)
+        self.counter = 0
+    def put(self, item, block=True, timeout=None):
+        """
+        put item with priority
+        """
+        super(_MyPriorityQueue, self).put((item[0], self.counter, item[1]), block, timeout)
+        self.counter += 1
+    def get(self, block=True, timeout=None):
+        """
+        get item with priority
+        """
+        _, _, item = super(_MyPriorityQueue, self).get(block, timeout)
+        return item
+    def clear(self):
+        """
+        clear the queue
+        """
+        self.queue.clear()
+        self.counter = 0
+
 
 class WireNet(Component):
     """
@@ -51,9 +94,7 @@ class WireNet(Component):
         self.wires_topology = []
         self.adjacency_dict = {}
         self.origin_adjacency_dict = {} # the base adjacency dict, will NOT change
-        # mapping dict and cache static path to accelerate
         self.mapping_dict = {}
-        self.cache_static_path = {}
         # horizontally wire as usual
         assert noc_topology in ["mesh", "torus"], \
             f"noc_topology: {noc_topology}, must be mesh or torus"
@@ -82,11 +123,17 @@ class WireNet(Component):
             if noc_topology == "torus":
                 wire_position = ((tile_net_shape[0] - 1, j), (0, j))
                 _construct_add_wire(wire_position)
+        # set function
+        self._heuristic_core = _mesh_heuristic if noc_topology == "mesh" else _torus_heuristic
         self.transparent_flag = False
-        # init adjacency dict
-        # IT SHOULD BE NOTICED THAT
-        # all path are defined based on the wires_topology
+        # init adjacency dict, all path are defined based on the wires_topology
         self._init_adjacency_dict(self.wires_topology)
+        # set the base instance for the breadth first search
+        self.frontier = _MyPriorityQueue()
+        self.came_from = dict()
+        self.cost_so_far = dict()
+        # cache
+        self.adaptive_cache_dict = dict()
 
     def _init_adjacency_dict(self, wires_topology):
         """
@@ -115,6 +162,16 @@ class WireNet(Component):
                 assert self.mapping_dict[node_b] == wire_position[1]
         # init origin adjacency dict
         self.origin_adjacency_dict = copy.deepcopy(self.adjacency_dict)
+
+    def _init_bfs(self):
+        """
+        init the bfs
+        frontier, came_from, cost_so_far
+        """
+        self.frontier.clear()
+        for key, _ in self.mapping_dict.items():
+            self.came_from[key] = None
+            self.cost_so_far[key] = float("inf")
 
     def _update_adjacency_dict(self, wire:BaseWire, state):
         """
@@ -166,7 +223,7 @@ class WireNet(Component):
                 path.append(current_position)
                 if current_position[index] == end_position[index]:
                     break
-        return [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+        return path
 
     def _winding_routing_path(self, start_position, end_position, order="row"):
         """
@@ -183,13 +240,13 @@ class WireNet(Component):
         else:
             raise ValueError(f"order: {order}, must be row or col")
         # find the path based on the operations and choice
-        # change for one to each other
-        path = [start_position]
         path_length_list = []
+        path = [start_position]
         current_position = start_position
         while True:
+            # in the start of every loop, change the choice
             choice = 1 - choice
-            # initialize the path length list
+            # initialize the path length list, and check if the path is changed
             path_length_list.append(len(path))
             if len(path_length_list) >= 3 and \
                 path_length_list[-1] == path_length_list[-2] == path_length_list[-3]:
@@ -198,7 +255,6 @@ class WireNet(Component):
             # first, get the index and shift
             index, shift = operations[choice]
             if end_position[index] == current_position[index]:
-                # change the choice
                 continue
             if end_position[index] < current_position[index]:
                 # change the shift
@@ -209,7 +265,6 @@ class WireNet(Component):
                     _get_map_key((current_position, next_position))
                 ].get_wire_state()
                 if state:
-                    # change the choice
                     break
                 current_position = next_position
                 path.append(current_position)
@@ -217,7 +272,7 @@ class WireNet(Component):
                     break
         # check if can find the path
         if path[-1] == end_position:
-            return [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+            return path
         return None
 
     def _west_first_routing_path(self, start_position, end_position):
@@ -249,87 +304,131 @@ class WireNet(Component):
             return self._xy_routing_path(start_position, end_position, order="col")
         return self._winding_routing_path(start_position, end_position, order="row")
 
-    def _find_data_path(self, start_position, end_position, dynamic_flag):
+    def _heuristic_distance(self, current_node, end_node):
         """
-        find the data path from start_position to end_position
-        start_position: tuple -> (row_index, column_index)
-        end_position: tuple -> (row_index, column_index)
-        dynamic_flag: bool -> for static path or dynamic path
+        calculate the heuristic distance between current node and end node
         """
-        # for dynamic and static, the adjacency dict is different
-        if dynamic_flag is True:
-            this_adjacency_dict = self.adjacency_dict
-        else:
-            # check for cache
-            cache_key = _get_map_key((start_position, end_position))
-            if cache_key in self.cache_static_path:
-                return self.cache_static_path[cache_key]
-            this_adjacency_dict = self.origin_adjacency_dict
-        # init the start node and end node
+        current_position = self.mapping_dict[current_node]
+        end_position = self.mapping_dict[end_node]
+        # calculate the heuristic distance
+        x_dis = abs(end_position[1] - current_position[1])
+        y_dis = abs(end_position[0] - current_position[0])
+        return self._heuristic_core(x_dis, self.tile_net_shape[1], y_dis, self.tile_net_shape[0])
+
+    def _get_path_based_came_from(self, start_node, end_node):
+        """
+        get the path from start node to end node based on came_from
+        """
+        if self.came_from[end_node] is None:
+            return None
+        path = [end_node]
+        current_node = end_node
+        while current_node != start_node:
+            current_node = self.came_from[current_node]
+            path.append(current_node)
+        path.reverse()
+        path = [self.mapping_dict[node] for node in path]
+        return path
+
+    def _greedy_best_first_routing_path(self, start_position, end_position, this_adjacency_dict):
+        """
+        find the data path based on greedy best first routing
+        """
+        # get start and end node, and init the queue, came_from
         start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
-        # init all node info list, and add the first start node
-        all_node_info = {}
-        for node, _ in this_adjacency_dict.items():
-            # the first item in list is distance from start_node, None for not reach
-            # the second is the previous node
-            all_node_info[node] = [None, None]
-        assert start_node in all_node_info and end_node in all_node_info, \
-            f"start_node and end_node should be in all_node_info"
-        all_node_info[start_node][0] = 0
-        # traverse the graph
-        add_node_list = [start_node]
-        path_flag = False
-        while True:
-            next_node_list = []
-            # get the next hops node
-            for node in add_node_list:
-                adjacency_node_list = this_adjacency_dict[node]
-                for adjacency_node in adjacency_node_list:
-                    if all_node_info[adjacency_node][0] is not None:
-                        continue
-                    # add to next node list
-                    all_node_info[adjacency_node] = [all_node_info[node][0] + 1, node]
-                    next_node_list.append(adjacency_node)
-            # check for output
-            if end_node in next_node_list:
-                # find end node, break
-                path_flag = True
+        self._init_bfs()
+        self.frontier.put((0, start_node))
+        self.came_from[start_node] = "null"
+        # get the node with highest priority
+        while not self.frontier.empty():
+            current_node = self.frontier.get()
+            if current_node == end_node:
+                # break when reach the end node
                 break
-            if len(next_node_list) == 0:
-                # no new node, break
-                path_flag = False
+            # get the neighbors of current node
+            for neighbor in this_adjacency_dict[current_node]:
+                if self.came_from[neighbor] is None:
+                    # calculate the priority
+                    priority = self._heuristic_distance(neighbor, end_node)
+                    self.frontier.put((priority, neighbor))
+                    self.came_from[neighbor] = current_node
+        # get the path from came_from
+        path = self._get_path_based_came_from(start_node, end_node)
+        return path
+
+    def _breadth_first_routing_path(
+            self, start_position, end_position, this_adjacency_dict, priority_func
+        ):
+        """
+        find the data path based on breadth first routing
+        """
+        # get start and end node, and init the queue, came_from and cost_so_far
+        start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
+        self._init_bfs()
+        self.frontier.put((0, start_node))
+        self.came_from[start_node] = None
+        self.cost_so_far[start_node] = 0
+        # get the node with highest priority
+        while not self.frontier.empty():
+            current_node = self.frontier.get()
+            if current_node == end_node:
+                # break when reach the end node
                 break
-            add_node_list = next_node_list
-        # get path if path is found
-        output_path = None
-        if path_flag is True:
-            # get total path
-            path = []
-            current_node = end_node
-            while True:
-                path.append(self.mapping_dict[current_node])
-                if current_node == start_node:
-                    break
-                current_node = all_node_info[current_node][1]
-            output_path = [(path[-1-i], path[-2-i]) for i in range(len(path)-1)] # get wire path
-        # for dynamic and static, the output is different
-        if dynamic_flag is True:
-            return output_path
-        assert output_path is not None, f"output_path should not be None"
-        self.cache_static_path[cache_key] = output_path
-        return self.cache_static_path[cache_key]
+            # get the neighbors of current node
+            for neighbor in this_adjacency_dict[current_node]:
+                neighbor_cost = self.cost_so_far[current_node] + 1
+                if neighbor_cost < self.cost_so_far[neighbor]:
+                    self.cost_so_far[neighbor] = neighbor_cost
+                    priority = neighbor_cost + priority_func(neighbor, end_node)
+                    self.frontier.put((priority, neighbor))
+                    self.came_from[neighbor] = current_node
+        # get the path from came_from
+        path = self._get_path_based_came_from(start_node, end_node)
+        return path
+
+    def _adaptive_routing_path(self, start_position, end_position):
+        """
+        find the data path based on adaptive routing (X-Y, support for mesh and torus)
+        """
+        cache_key = _get_map_key((start_position, end_position))
+        if cache_key not in self.adaptive_cache_dict:
+            self.adaptive_cache_dict[cache_key] = self._breadth_first_routing_path(
+                start_position, end_position, self.origin_adjacency_dict, lambda x, y: 0
+            )
+        return self.adaptive_cache_dict[cache_key]
+
+    def _greedy_routing_path(self, start_position, end_position):
+        """
+        find the data path based on greedy routing
+        """
+        return self._greedy_best_first_routing_path(
+            start_position, end_position, self.adjacency_dict
+        )
+
+    def _dijkstra_routing_path(self, start_position, end_position):
+        """
+        find the data path based on dijkstra routing
+        """
+        return self._breadth_first_routing_path(
+            start_position, end_position, self.adjacency_dict, lambda x, y: 0
+        )
+
+    def _astar_routing_path(self, start_position, end_position):
+        """
+        find the data path based on astar routing
+        """
+        return self._breadth_first_routing_path(
+            start_position, end_position, self.adjacency_dict, self._heuristic_distance
+        )
 
     def find_data_path_cate(self, start_position, end_position, cate):
         """
         find the data path from start_position to end_position_list
         start_position: tuple -> (row_index, column_index)
         end_position: tuple -> (row_index, column_index)
-        cate: str -> different path generator, "naive", "adaptive"
+        cate: str -> different path generator, "naive", "adaptive" and so on
         """
         # this function is the decorator of _find_data_path function
-        # find_data_path_cate(start, end, "naive") is equal to X-Y routing in mesh
-        # find_data_path_cate(start, end, "adaptive") is equal to _find_data_path(start, end, False)
-        # find_data_path_cate(start, end, "dijkstra") is equal to _find_data_path(start, end, True)
         if cate == "naive":
             return self._xy_routing_path(start_position, end_position, "row")
         if cate == "west_first":
@@ -339,10 +438,14 @@ class WireNet(Component):
         if cate == "negative_first":
             return self._negative_first_routing_path(start_position, end_position)
         if cate == "adaptive":
-            return self._find_data_path(start_position, end_position, False)
+            return self._adaptive_routing_path(start_position, end_position)
+        if cate == "greedy":
+            return self._greedy_routing_path(start_position, end_position)
         if cate == "dijkstra":
-            return self._find_data_path(start_position, end_position, True)
-        raise ValueError(f"cate should be naive, adaptive or dijkstra, but get {cate}")
+            return self._dijkstra_routing_path(start_position, end_position)
+        if cate == "astar":
+            return self._astar_routing_path(start_position, end_position)
+        raise ValueError(f"cate should be support cates but get {cate}")
 
     def set_transparent_flag(self, transparent_flag):
         """
@@ -357,8 +460,11 @@ class WireNet(Component):
         get data path state
         return False only when all wires are idle
         """
-        all_state = [self.wires_map[_get_map_key(path)].get_wire_state()
-            for path in transfer_path
+        all_state = [
+            self.wires_map[
+                _get_map_key((transfer_path[i], transfer_path[i+1]))
+            ].get_wire_state()
+            for i in range(len(transfer_path)-1)
         ]
         return any(all_state)
 
@@ -366,7 +472,8 @@ class WireNet(Component):
         """
         set data path state, and record transfer range time
         """
-        for path in transfer_path:
+        for i in range(len(transfer_path)-1):
+            path = (transfer_path[i], transfer_path[i+1])
             wire = self.wires_map[_get_map_key(path)]
             wire.set_wire_state(state, communication_id, current_time)
             self._update_adjacency_dict(wire, state)
@@ -375,8 +482,9 @@ class WireNet(Component):
         """
         get wire transfer time
         """
-        transfer_time = 0
-        for path in transfer_path:
+        transfer_time = 0.
+        for i in range(len(transfer_path)-1):
+            path = (transfer_path[i], transfer_path[i+1])
             wire = self.wires_map[_get_map_key(path)]
             transfer_time += wire.get_transfer_time(data_list)
         return transfer_time
@@ -392,6 +500,7 @@ class WireNet(Component):
         """
         show wire rate, two decimal places
         """
+        # only for mesh, not for torus
         horizontal_rate = np.zeros(
             [self.tile_net_shape[0], self.tile_net_shape[1] - 1]
         )
