@@ -18,7 +18,7 @@ path_generator = sys.argv[1]
 assert path_generator in [
     "naive",
     "west_first", "north_last", "negative_first",
-    "adaptive", "dijkstra"
+    "adaptive", "greedy", "dijkstra", "astar"
 ]
 
 mapping_list = ["naive", "snake", "impact"]
