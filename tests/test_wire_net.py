@@ -74,7 +74,9 @@ def test_topology_path_generator(noc_topology, path_generator):
     wire_net.set_data_path_state([(2, 0), (2, 1)], True, "0->1", 0.)
     _output_info(start_position, end_position, wire_net, path_generator)
 
-@pytest.mark.parametrize("cate", ["naive", "west_first", "north_last", "negative_first", "adaptive", "dijkstra"])
+@pytest.mark.parametrize("cate",
+    ["naive", "west_first", "north_last", "negative_first", "adaptive", "dijkstra"]
+)
 def test_turn_model(cate):
     """
     test turn model under different cate
@@ -101,6 +103,7 @@ def test_turn_model(cate):
     print("-" * 20 + "case 2" + "-" * 20)
     for end_position in end_position_list:
         _output_info(start_position, end_position, wire_net, cate)
+    pass
 
 @pytest.mark.parametrize("cate", ["adaptive", "greedy", "dijkstra", "astar"])
 def test_bfs_model(cate):
@@ -125,3 +128,4 @@ def test_bfs_model(cate):
     wire_net.set_data_path_state([(2, 2), (2, 3)], True, "0->1", 0.)
     wire_net.set_data_path_state([(3, 2), (3, 3)], True, "0->1", 0.)
     _output_info(start_position, end_position, wire_net, cate)
+    pass

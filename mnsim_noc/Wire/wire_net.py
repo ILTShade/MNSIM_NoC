@@ -133,6 +133,7 @@ class WireNet(Component):
         self.came_from = dict()
         self.cost_so_far = dict()
         # cache
+        self.xy_cache_dict = dict()
         self.adaptive_cache_dict = dict()
 
     def _init_adjacency_dict(self, wires_topology):
@@ -199,6 +200,10 @@ class WireNet(Component):
         start_position: tuple -> (row_index, column_index)
         end_position: tuple -> (row_index, column_index)
         """
+        # check for there are cache key
+        cache_key = _get_map_key((start_position, end_position)) + order
+        if cache_key in self.xy_cache_dict:
+            return self.xy_cache_dict[cache_key]
         # row for in X dimension first, and Y dimension second
         # col for in Y dimension first, and X dimension second
         if order == "row":
@@ -223,7 +228,9 @@ class WireNet(Component):
                 path.append(current_position)
                 if current_position[index] == end_position[index]:
                     break
-        return path
+        # set cache key
+        self.xy_cache_dict[cache_key] = path
+        return self.xy_cache_dict[cache_key]
 
     def _winding_routing_path(self, start_position, end_position, order="row"):
         """
