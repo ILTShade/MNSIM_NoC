@@ -76,7 +76,7 @@ def test_communication():
         tile_2.update(current_time)
         # map communication schedule
         if communication_1.check_communication_ready():
-            transfer_path = [((0, 0), (0, 1))]
+            transfer_path = [(0, 0), (0, 1)]
             communication_1.set_communication_task(current_time, transfer_path, 2.7)
         else:
             transfer_path = None

@@ -144,6 +144,6 @@ def test_array():
         "test",
         get_test_config(), 2,
         "mesh", (3, 3), (4096, 4096), 1,
-        "naive", mapping_strategy="snake", transparent_flag=True
+        "snake", "naive", False, "naive"
     )
     array.run()

@@ -35,3 +35,4 @@ def test_candidate():
     candidate_d = candidate_b.mutation()
     # crossover candidate
     candidate_e = Candidate.crossover(candidate_c, candidate_d)
+    print(candidate_e)

@@ -44,7 +44,7 @@ def test_buffer():
     output_buffer = OutputBuffer(256)
     # for computation example on the tile output buffer
     # judge part
-    assert(output_buffer.check_remain_size() == 256)
+    assert output_buffer.check_remain_size() == 256
     # computation start, nothing
     # computation end
     output_buffer.add_data_list(data_list[0:1])
