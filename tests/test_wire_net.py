@@ -103,7 +103,6 @@ def test_turn_model(cate):
     print("-" * 20 + "case 2" + "-" * 20)
     for end_position in end_position_list:
         _output_info(start_position, end_position, wire_net, cate)
-    pass
 
 @pytest.mark.parametrize("cate", ["adaptive", "greedy", "dijkstra", "astar"])
 def test_bfs_model(cate):
@@ -128,4 +127,15 @@ def test_bfs_model(cate):
     wire_net.set_data_path_state([(2, 2), (2, 3)], True, "0->1", 0.)
     wire_net.set_data_path_state([(3, 2), (3, 3)], True, "0->1", 0.)
     _output_info(start_position, end_position, wire_net, cate)
-    pass
+
+@pytest.mark.parametrize("cate", ["adaptive", "greedy", "dijkstra", "astar"])
+def test_difference_dijkstra_astar(cate):
+    """
+    test difference between dijkstra and astar
+    """
+    wire_net = WireNet((5, 5), 1, "mesh")
+    start_position = (4, 0)
+    end_position = (0, 0)
+    print("-" * 20 + "base case" + "-" * 20)
+    wire_net.set_data_path_state([(1, 0), (2, 0)], True, "0->1", 0.)
+    _output_info(start_position, end_position, wire_net, cate)
