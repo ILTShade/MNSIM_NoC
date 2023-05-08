@@ -470,9 +470,6 @@ class WireNet(Component):
         """
         find the data path based on adaptive routing (X-Y, support for mesh and torus)
         """
-        # return self._breadth_first_routing_path(
-        #     start_position, end_position, self.origin_adjacency_dict, lambda x,y: 0
-        # )
         cache_key = _get_map_key((start_position, end_position))
         if cache_key not in self.adaptive_cache_dict:
             self.adaptive_cache_dict[cache_key] = self._breadth_first_routing_path(
