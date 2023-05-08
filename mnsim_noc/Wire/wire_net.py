@@ -46,32 +46,92 @@ def _torus_heuristic(x_dis, x_len, y_dis, y_len):
     """
     return min(x_dis, x_len - x_dis) + min(y_dis, y_len - y_dis)
 
-class _MyPriorityQueue(PriorityQueue):
+class _MyQueue(object):
     """
-    add a counter to the PriorityQueue
+    my queue
     """
-    def __init__(self, *args, **kwargs):
-        super(_MyPriorityQueue, self).__init__(*args, **kwargs)
-        self.counter = 0
-    def put(self, item, block=True, timeout=None):
+    def __init__(self, max_len):
         """
-        put item with priority
+        init with max_ length
         """
-        super(_MyPriorityQueue, self).put((item[0], self.counter, item[1]), block, timeout)
-        self.counter += 1
-    def get(self, block=True, timeout=None):
+        self.queue = [None] * max_len
+        self.start_index, self.end_index = 0, 0
+    def put(self, item):
         """
-        get item with priority
+        put item without priority
         """
-        _, _, item = super(_MyPriorityQueue, self).get(block, timeout)
+        self.queue[self.end_index] = item
+        self.end_index += 1
+    def get(self):
+        """
+        get item
+        """
+        item = self.queue[self.start_index]
+        self.start_index += 1
         return item
     def clear(self):
         """
         clear the queue
         """
-        self.queue.clear()
-        self.counter = 0
+        self.start_index, self.end_index = 0, 0
+    def empty(self):
+        """
+        check if the queue is empty
+        """
+        return self.start_index == self.end_index
 
+class _MyPriorityQueue(object):
+    """
+    adopt the sorted list as the priority queue
+    """
+    def __init__(self, max_len):
+        self.queue = [None] * max_len
+        self.start_index, self.end_index = 0, 0
+    def put(self, item):
+        """
+        put item with priority
+        item: tuple -> (priority, value)
+        smaller priority, higher in the list
+        """
+        priority, _ = item
+        if self.end_index == self.start_index or \
+            priority >= self.queue[self.end_index-1][0]:
+            self.queue[self.end_index] = item
+        elif priority < self.queue[self.start_index][0]:
+            for i in range(self.end_index, self.start_index, -1):
+                self.queue[i] = self.queue[i-1]
+            self.queue[self.start_index] = item
+        else:
+            # get the index to insert
+            tmp_start, tmp_end = self.start_index, self.end_index
+            while tmp_start + 1 != tmp_end:
+                tmp_mid = (tmp_start + tmp_end) // 2
+                if priority < self.queue[tmp_mid][0]:
+                    tmp_end = tmp_mid
+                else:
+                    tmp_start = tmp_mid
+            # insert to tmp_end
+            for i in range(self.end_index, tmp_end, -1):
+                self.queue[i] = self.queue[i-1]
+            self.queue[tmp_end] = item
+        self.end_index += 1
+    def get(self):
+        """
+        get item with priority
+        """
+        item = self.queue[self.start_index]
+        self.start_index += 1
+        return item[1]
+    def clear(self):
+        """
+        clear the queue
+        """
+        self.start_index, self.end_index = 0, 0
+    def empty(self):
+        """
+        check if the queue is empty
+        """
+        return self.start_index == self.end_index
 
 class WireNet(Component):
     """
@@ -128,10 +188,6 @@ class WireNet(Component):
         self.transparent_flag = False
         # init adjacency dict, all path are defined based on the wires_topology
         self._init_adjacency_dict(self.wires_topology)
-        # set the base instance for the breadth first search
-        self.frontier = _MyPriorityQueue()
-        self.came_from = dict()
-        self.cost_so_far = dict()
         # cache
         self.xy_cache_dict = dict()
         self.adaptive_cache_dict = dict()
@@ -163,16 +219,6 @@ class WireNet(Component):
                 assert self.mapping_dict[node_b] == wire_position[1]
         # init origin adjacency dict
         self.origin_adjacency_dict = copy.deepcopy(self.adjacency_dict)
-
-    def _init_bfs(self):
-        """
-        init the bfs
-        frontier, came_from, cost_so_far
-        """
-        self.frontier.clear()
-        for key, _ in self.mapping_dict.items():
-            self.came_from[key] = None
-            self.cost_so_far[key] = float("inf")
 
     def _update_adjacency_dict(self, wire:BaseWire, state):
         """
@@ -322,48 +368,74 @@ class WireNet(Component):
         y_dis = abs(end_position[0] - current_position[0])
         return self._heuristic_core(x_dis, self.tile_net_shape[1], y_dis, self.tile_net_shape[0])
 
-    def _get_path_based_came_from(self, start_node, end_node):
+    def _get_path_based_came_from(self, came_from, start_node, end_node):
         """
         get the path from start node to end node based on came_from
         """
-        if self.came_from[end_node] is None:
+        if end_node not in came_from or came_from[end_node] is None:
             return None
         path = [end_node]
         current_node = end_node
         while current_node != start_node:
-            current_node = self.came_from[current_node]
+            current_node = came_from[current_node]
             path.append(current_node)
         path.reverse()
         path = [self.mapping_dict[node] for node in path]
         return path
 
-    def _greedy_best_first_routing_path(self, start_position, end_position, this_adjacency_dict):
+    def _breadth_first_routing_path(self, start_position, end_position, this_adjacency_dict):
+        """
+        find the data path based on breadth first routing
+        for adaptive and dijkstra (cate)
+        there is no difference between breadth first and dijkstra since there are no different cost
+        """
+        start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
+        frontier = _MyQueue(self.tile_net_shape[0] * self.tile_net_shape[1])
+        came_from = dict()
+        # get the node with highest priority
+        frontier.put(start_node)
+        while not frontier.empty():
+            current_node = frontier.get()
+            # check if reach the end node
+            if current_node == end_node:
+                break
+            for neighbor in this_adjacency_dict[current_node]:
+                if neighbor not in came_from:
+                    frontier.put(neighbor)
+                    came_from[neighbor] = current_node
+        # get the path from came_from
+        path = self._get_path_based_came_from(came_from, start_node, end_node)
+        return path
+
+    def _greedy_best_first_routing_path(
+            self, start_position, end_position, this_adjacency_dict, priority_func
+        ):
         """
         find the data path based on greedy best first routing
         """
         # get start and end node, and init the queue, came_from
         start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
-        self._init_bfs()
-        self.frontier.put((0, start_node))
-        self.came_from[start_node] = "null"
+        frontier = _MyPriorityQueue(self.tile_net_shape[0] * self.tile_net_shape[1] * 3) # 3 means all
+        came_from = dict()
         # get the node with highest priority
-        while not self.frontier.empty():
-            current_node = self.frontier.get()
+        frontier.put((0, start_node))
+        while not frontier.empty():
+            current_node = frontier.get()
+            # check if reach the end node
             if current_node == end_node:
-                # break when reach the end node
                 break
             # get the neighbors of current node
             for neighbor in this_adjacency_dict[current_node]:
-                if self.came_from[neighbor] is None:
-                    # calculate the priority
-                    priority = self._heuristic_distance(neighbor, end_node)
-                    self.frontier.put((priority, neighbor))
-                    self.came_from[neighbor] = current_node
+                if neighbor not in came_from:
+                    # calculate the priority and put it into the queue
+                    priority = priority_func(neighbor, end_node)
+                    frontier.put((priority, neighbor))
+                    came_from[neighbor] = current_node
         # get the path from came_from
-        path = self._get_path_based_came_from(start_node, end_node)
+        path = self._get_path_based_came_from(came_from, start_node, end_node)
         return path
 
-    def _breadth_first_routing_path(
+    def _combine_first_routing_path(
             self, start_position, end_position, this_adjacency_dict, priority_func
         ):
         """
@@ -371,36 +443,40 @@ class WireNet(Component):
         """
         # get start and end node, and init the queue, came_from and cost_so_far
         start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
-        self._init_bfs()
-        self.frontier.put((0, start_node))
-        self.came_from[start_node] = None
-        self.cost_so_far[start_node] = 0
+        frontier = _MyPriorityQueue(self.tile_net_shape[0] * self.tile_net_shape[1] * 3) # 3 means all
+        came_from = dict()
+        cost_so_far = dict()
         # get the node with highest priority
-        while not self.frontier.empty():
-            current_node = self.frontier.get()
+        frontier.put((0, start_node))
+        cost_so_far[start_node] = 0
+        while not frontier.empty():
+            current_node = frontier.get()
+            # check if reach the end node
             if current_node == end_node:
-                # break when reach the end node
                 break
             # get the neighbors of current node
             for neighbor in this_adjacency_dict[current_node]:
-                neighbor_cost = self.cost_so_far[current_node] + 1
-                if neighbor_cost < self.cost_so_far[neighbor]:
-                    self.cost_so_far[neighbor] = neighbor_cost
+                neighbor_cost = cost_so_far[current_node] + 1
+                if neighbor not in cost_so_far or neighbor_cost < cost_so_far[neighbor]:
+                    cost_so_far[neighbor] = neighbor_cost
                     priority = neighbor_cost + priority_func(neighbor, end_node)
-                    self.frontier.put((priority, neighbor))
-                    self.came_from[neighbor] = current_node
+                    frontier.put((priority, neighbor))
+                    came_from[neighbor] = current_node
         # get the path from came_from
-        path = self._get_path_based_came_from(start_node, end_node)
+        path = self._get_path_based_came_from(came_from, start_node, end_node)
         return path
 
     def _adaptive_routing_path(self, start_position, end_position):
         """
         find the data path based on adaptive routing (X-Y, support for mesh and torus)
         """
+        # return self._breadth_first_routing_path(
+        #     start_position, end_position, self.origin_adjacency_dict, lambda x,y: 0
+        # )
         cache_key = _get_map_key((start_position, end_position))
         if cache_key not in self.adaptive_cache_dict:
             self.adaptive_cache_dict[cache_key] = self._breadth_first_routing_path(
-                start_position, end_position, self.origin_adjacency_dict, lambda x, y: 0
+                start_position, end_position, self.origin_adjacency_dict
             )
         return self.adaptive_cache_dict[cache_key]
 
@@ -409,7 +485,7 @@ class WireNet(Component):
         find the data path based on greedy routing
         """
         return self._greedy_best_first_routing_path(
-            start_position, end_position, self.adjacency_dict
+            start_position, end_position, self.adjacency_dict, self._heuristic_distance
         )
 
     def _dijkstra_routing_path(self, start_position, end_position):
@@ -417,14 +493,14 @@ class WireNet(Component):
         find the data path based on dijkstra routing
         """
         return self._breadth_first_routing_path(
-            start_position, end_position, self.adjacency_dict, lambda x, y: 0
+            start_position, end_position, self.adjacency_dict
         )
 
     def _astar_routing_path(self, start_position, end_position):
         """
         find the data path based on astar routing
         """
-        return self._breadth_first_routing_path(
+        return self._combine_first_routing_path(
             start_position, end_position, self.adjacency_dict, self._heuristic_distance
         )
 
