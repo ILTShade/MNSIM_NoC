@@ -10,6 +10,7 @@
 import copy
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Buffer import MultiInputBuffer, MultiOutputBuffer
+from mnsim_noc.Buffer.base_buffer import get_data_size
 
 class BaseTile(Component):
     """
@@ -43,6 +44,8 @@ class BaseTile(Component):
         self.output_buffer = MultiOutputBuffer(buffer_size[1], self.target_tile_id)
         # running state, False for idle, True for running
         self.running_state = False
+        # calculate the amount of all output data
+        self.total_amount_output_size = 0
         self.computation_list = self._get_computation_list()
         self.computation_id = 0
         self.computation_end_time = float("inf")
@@ -65,6 +68,9 @@ class BaseTile(Component):
                         # x, y, start, end, bit, total, image_id, layer_id, tile_id
                         value[6] = i
                 computation_list.append([dependence, "idle"])
+                # calculate the amount of all output data
+                assert len(dependence["output"]) == 1, "output should only be one"
+                self.total_amount_output_size += get_data_size(dependence["output"][0])
         return computation_list
 
     def update(self, current_time):
