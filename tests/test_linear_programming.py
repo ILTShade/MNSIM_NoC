@@ -30,6 +30,7 @@ from mnsim_noc.utils.yaml_io import read_yaml
 from mnsim_noc.utils.linear_programming import ScheduleLinearProgramming
 
 
+# @pytest.mark.parametrize("config, task", [("datas/cifar_base.yaml", "/home/sunhanbo/nfs/mnsim_noc_date/datas/.pkl")])
 @pytest.mark.parametrize("config, task", [("examples/test.yaml", "examples/test.pkl")])
 def test_schedule(config, task):
     """
@@ -71,3 +72,5 @@ def test_schedule(config, task):
     wire_net.set_transparent_flag(transparent_flag)
     # set up the linear programming
     linear_programming = ScheduleLinearProgramming(communication_list, wire_net)
+    linear_programming.solve()
+    linear_programming.parse_x(linear_programming.optimal_x)

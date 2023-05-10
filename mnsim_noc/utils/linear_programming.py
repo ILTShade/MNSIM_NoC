@@ -9,13 +9,17 @@
 @CreateTime:
     2023/05/09 18:14
 """
+import copy
 from typing import List
+
+import cvxpy as cp
 import numpy as np
 
-from mnsim_noc.utils.component import Component
-from mnsim_noc.Tile.base_tile import BaseTile
 from mnsim_noc.Communication.base_communication import BaseCommunication
-from mnsim_noc.Wire.wire_net import WireNet, _get_position_key, _get_map_key
+from mnsim_noc.Tile.base_tile import BaseTile
+from mnsim_noc.utils.component import Component
+from mnsim_noc.Wire.wire_net import WireNet, _get_map_key, _get_position_key
+
 
 def _get_index(_v, _d):
     """
@@ -37,9 +41,13 @@ class ScheduleLinearProgramming(Component):
         """
         super(ScheduleLinearProgramming, self).__init__()
         # set up the params
+        self.communication_list = communication_list
+        self.wire_net = wire_net
+        self.epsilon = 1e-5
         self._set_up_params(communication_list, wire_net)
 
     def _set_up_params(self, communication_list: List[BaseCommunication], wire_net: WireNet):
+        self.logger.info("set up the params for the linear programming...")
         # first, get the arc-node incidence matrix based on the adjacency dict
         this_adjacency_dict = wire_net.adjacency_dict
         # mapping dict is used to transfer the node str to node position (in tuple)
@@ -78,13 +86,9 @@ class ScheduleLinearProgramming(Component):
             B[node_start_index][k] = T_k
             B[node_end_index][k] = -T_k
         # check for the B matrix
-        ones_M = np.ones(shape=(M, 1))
-        zeros_K = np.zeros(shape=(K, 1))
-        assert (np.matmul(B.T, ones_M) == zeros_K).all(), \
+        assert (np.matmul(B.T, np.ones(shape=(M, 1))) == np.zeros(shape=(K, 1))).all(), \
             "the sum of supply and demand is not zero"
         # third, get other parameters and equivalent path
-        zeros_E_K = np.zeros(shape=(E, K))
-        alpha, beta = 1, 1
         Cost = np.ones(shape=(E, 1))
         Value = np.ones(shape=(K, 1))
         E_extra = len(wire_net.wires)
@@ -107,8 +111,125 @@ class ScheduleLinearProgramming(Component):
         assert (np.matmul(EP.T, np.ones(shape=(E_extra, 1))) == np.ones(shape=(E, 1))).all(), \
             "the sum of equivalent path column must be 1"
         # transfer to the self members
-        self.alpha, self.beta = alpha, beta
+        self.alpha, self.beta = 1, 1
         self.C, self.V = Cost, Value
-        self.EP, self.zeros_E_K = EP, zeros_E_K
+        self.EP = EP
         self.A, self.B = A, B
         self.M, self.E, self.K, self.E_extra = M, E, K, E_extra
+        # save the mapping_dice, node_index_dict and edge_index_dict
+        self.mapping_dict = this_mapping_dict
+        self.node_index_dict = node_index_dict
+        self.edge_index_dict = edge_index_dict
+        self.logger.info("set up the params for the linear programming successfully")
+
+    def solve(self):
+        """
+        solve the linear programming
+        """
+        # define the variables
+        self.logger.info("start solving the linear programming...")
+        X = cp.Variable(shape=(self.E, self.K), name="X", nonneg=True)
+        # define two obj and constraints
+        obj1 = cp.matmul(self.C.T, cp.matmul(X, self.V))
+        obj2 = cp.max(cp.matmul(self.EP, cp.matmul(X, self.V)))
+        obj_total = self.alpha * obj1 + self.beta * obj2
+        constraints = [self.A @ X == self.B]
+        # define and solve the problem
+        Problem = cp.Problem(cp.Minimize(obj_total), constraints)
+        Problem.solve()
+        # check the status
+        assert Problem.status == cp.OPTIMAL, \
+            "the linear programming is not solved successfully"
+        # get the result and saved into the self members
+        self.optimal_x = X.value
+        self.optimal_obj_total_transfer_cost = obj1.value[0][0]
+        self.optimal_obj_max_single_wire = obj2.value.item()
+        self.optimal_obj_in_total = Problem.value
+        self.logger.info(f"the optimal total transfer cost is: {self.optimal_obj_total_transfer_cost}")
+        self.logger.info(f"the optimal max single wire is: {self.optimal_obj_max_single_wire}")
+        self.logger.info("the optimal objective value is: ", self.optimal_obj_in_total)
+        return self.optimal_x
+
+    def parse_x(self, X):
+        """
+        parse the X matrix to the communication schedule info for each communication
+        the order is the same as the input communication list
+        X is in shape (E, K)
+        """
+        MyX = copy.deepcopy(X)
+        # check for the input X
+        assert (MyX >= 0).all(), \
+            "the input X is not correct, must all be non-negative"
+        assert ((np.matmul(self.A, MyX) - self.B) < self.epsilon).all(), \
+            "the input X is not correct, A@X == B"
+        # use A to get the node-edge link, prepared for the following process
+        node_edge_relation = np.where(self.A == 1)
+        node_edge_link = [[] for _ in range(self.M)]
+        for node_index, edge_index in zip(node_edge_relation[0], node_edge_relation[1]):
+            node_edge_link[node_index].append(edge_index)
+        _get_edge_index_based_node = lambda node: node_edge_link[self.node_index_dict[node]]
+        # use edge_index_dict to reverse the edge_index
+        edge_index_reverse = [-1] * self.E
+        for edge_description, edge_index in self.edge_index_dict.items():
+            edge_index_reverse[edge_index] = edge_description
+        # get the communication schedule info from MyX
+        communication_schedule_info_list = [[] for _ in range(self.K)]
+        for k, comm in enumerate(self.communication_list):
+            # get the input tile and the end tile
+            input_tile: BaseTile = comm.input_tile
+            output_tile: BaseTile = comm.output_tile
+            # get the start node and end node
+            start_node = _get_position_key(input_tile.position)
+            end_node = _get_position_key(output_tile.position)
+            #
+            all_transfer_data_amount = input_tile.total_amount_output_size
+            while True:
+                # check for if the outputs from the start node
+                start_link_edge = _get_edge_index_based_node(start_node)
+                start_link_flow = MyX[start_link_edge, k]
+                if np.max(start_link_flow) < self.epsilon:
+                    # there are no value need to output (small than epsilon)
+                    break
+                path_cost = []
+                # otherwise, there must be one path to the end node
+                current_node = start_node
+                while True:
+                    # check for if the current node is the end node
+                    if current_node == end_node:
+                        break
+                    # otherwise
+                    current_link_edge = _get_edge_index_based_node(current_node)
+                    current_link_flow = MyX[current_link_edge, k]
+                    # parse max edge
+                    max_edge_index = current_link_edge[np.argmax(current_link_flow)]
+                    max_edge_desc = edge_index_reverse[max_edge_index]
+                    # get the next node
+                    current_node = max_edge_desc.split("->")[1]
+                    # get the cost of this path
+                    cost = MyX[max_edge_index, k]
+                    path_cost.append((current_node, cost))
+                # get the path, check if there are loop in the path
+                path = [start_node] + [x[0] for x in path_cost]
+                assert len(set(path)) == len(path), \
+                    "there are loop in the path"
+                # get the cost of this path
+                max_cost = min([x[1] for x in path_cost])
+                assert max_cost > 0, \
+                    "the max cost of the path small than epsilon"
+                # update the MyX
+                for i in range(len(path)-1):
+                    edge_desc = path[i] + "->" + path[i+1]
+                    edge_index = self.edge_index_dict[edge_desc]
+                    MyX[edge_index, k] -= max_cost
+                # add to the communication schedule info
+                communication_schedule_info_list[k].append((
+                    [self.mapping_dict[v] for v in path], max_cost
+                ))
+                all_transfer_data_amount -= max_cost
+            # check for if the communication is finished
+            assert all([abs(x) < self.epsilon for x in MyX[:, k]]), \
+                "the communication is not finished, some value is not 0"
+            # 4 for there are 4 edges at most
+            assert 0 <= all_transfer_data_amount < 4 * self.epsilon, \
+                "the communication is not finished, the all_transfer_data_amount is not 0"
+        return communication_schedule_info_list
