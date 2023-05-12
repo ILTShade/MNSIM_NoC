@@ -23,16 +23,18 @@
 import pickle
 
 import pytest
+import numpy as np
+import cvxpy as cp
 
 from mnsim_noc.Array import BaseArray
 from mnsim_noc.Strategy import Schedule
 from mnsim_noc.utils.yaml_io import read_yaml
 from mnsim_noc.utils.linear_programming import ScheduleLinearProgramming
 
-
 # @pytest.mark.parametrize("config, task", [("datas/cifar_base.yaml", "/home/sunhanbo/nfs/mnsim_noc_date/datas/.pkl")])
 @pytest.mark.parametrize("config, task", [("examples/test.yaml", "examples/test.pkl")])
-def test_schedule(config, task):
+@pytest.mark.parametrize("solver", cp.installed_solvers())
+def test_schedule(config, task, solver):
     """
     test schedule step for each communication
     """
@@ -72,5 +74,18 @@ def test_schedule(config, task):
     wire_net.set_transparent_flag(transparent_flag)
     # set up the linear programming
     linear_programming = ScheduleLinearProgramming(communication_list, wire_net)
+    linear_programming.B[:,0] = linear_programming.B[:,0] / 4
+    linear_programming.solver = solver
     linear_programming.solve()
-    linear_programming.parse_x(linear_programming.optimal_x)
+    comm_schedule_info_list = linear_programming.parse_x(linear_programming.optimal_x)
+    # show the result communication info
+    print("-"*20)
+    print(f"the optimal total transfer cost is {linear_programming.optimal_obj_total_transfer_cost}")
+    optimal_value2 = linear_programming.optimal_obj_single_wire
+    optimal_value2 = optimal_value2[np.abs(optimal_value2) < linear_programming.epsilon]
+    print(f"the optimal single wire is: {optimal_value2}")
+    print(f"the optimal object value is {linear_programming.optimal_obj_in_total}")
+    for comm_id, comm_schedule_info in enumerate(comm_schedule_info_list):
+        print(f"communication {comm_id} schedule info:")
+        for path_id, (path, path_cost) in enumerate(comm_schedule_info):
+            print(f"path {path_id}: {path}, cost: {path_cost}")

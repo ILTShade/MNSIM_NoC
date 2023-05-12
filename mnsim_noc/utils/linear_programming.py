@@ -128,25 +128,25 @@ class ScheduleLinearProgramming(Component):
         """
         # define the variables
         self.logger.info("start solving the linear programming...")
-        X = cp.Variable(shape=(self.E, self.K), name="X", nonneg=True)
+        X = cp.Variable(shape=(self.E, self.K))
         # define two obj and constraints
         obj1 = cp.matmul(self.C.T, cp.matmul(X, self.V))
-        obj2 = cp.max(cp.matmul(self.EP, cp.matmul(X, self.V)))
-        obj_total = self.alpha * obj1 + self.beta * obj2
-        constraints = [self.A @ X == self.B]
+        obj2 = cp.matmul(self.EP, cp.matmul(X, self.V))
+        obj_total = self.alpha * obj1 + self.beta * cp.norm2(obj2)
+        constraints = [self.A @ X == self.B, X >= 0]
         # define and solve the problem
         Problem = cp.Problem(cp.Minimize(obj_total), constraints)
-        Problem.solve()
+        Problem.solve(solver=self.solver, verbose=True)
         # check the status
         assert Problem.status == cp.OPTIMAL, \
             "the linear programming is not solved successfully"
         # get the result and saved into the self members
         self.optimal_x = X.value
         self.optimal_obj_total_transfer_cost = obj1.value[0][0]
-        self.optimal_obj_max_single_wire = obj2.value.item()
+        self.optimal_obj_single_wire = obj2.value[:,0]
         self.optimal_obj_in_total = Problem.value
         self.logger.info(f"the optimal total transfer cost is: {self.optimal_obj_total_transfer_cost}")
-        self.logger.info(f"the optimal max single wire is: {self.optimal_obj_max_single_wire}")
+        self.logger.info(f"the optimal single wire is: {self.optimal_obj_single_wire}")
         self.logger.info("the optimal objective value is: ", self.optimal_obj_in_total)
         return self.optimal_x
 
@@ -158,7 +158,7 @@ class ScheduleLinearProgramming(Component):
         """
         MyX = copy.deepcopy(X)
         # check for the input X
-        assert (MyX >= 0).all(), \
+        assert np.min(MyX) > -self.epsilon, \
             "the input X is not correct, must all be non-negative"
         assert ((np.matmul(self.A, MyX) - self.B) < self.epsilon).all(), \
             "the input X is not correct, A@X == B"
@@ -181,8 +181,8 @@ class ScheduleLinearProgramming(Component):
             # get the start node and end node
             start_node = _get_position_key(input_tile.position)
             end_node = _get_position_key(output_tile.position)
-            #
-            all_transfer_data_amount = input_tile.total_amount_output_size
+            # get the total amount of data need to transfer
+            all_transfer_data_amount = self.B[self.node_index_dict[start_node], k]
             while True:
                 # check for if the outputs from the start node
                 start_link_edge = _get_edge_index_based_node(start_node)
@@ -230,6 +230,6 @@ class ScheduleLinearProgramming(Component):
             assert all([abs(x) < self.epsilon for x in MyX[:, k]]), \
                 "the communication is not finished, some value is not 0"
             # 4 for there are 4 edges at most
-            assert 0 <= all_transfer_data_amount < 4 * self.epsilon, \
+            assert -self.epsilon < all_transfer_data_amount < 4 * self.epsilon, \
                 "the communication is not finished, the all_transfer_data_amount is not 0"
         return communication_schedule_info_list
