@@ -32,34 +32,34 @@ from mnsim_noc.utils.yaml_io import read_yaml
 from mnsim_noc.utils.linear_programming import ScheduleLinearProgramming
 
 solver_config_list = [
-    "1,1,COPT,norm,float",
-    "1,1,ECOS,norm,float",
-    "1,1,ECOS_BB,norm,float",
-    "1,1,GUROBI,norm,float",
-    "1,1,MOSEK,norm,float",
-    "1,1,SCS,norm,float",
+    "1,1,COPT,norm,float", # 6.31 s
+    "1,1,ECOS,norm,float", # 62.2 s
+    "1,1,ECOS_BB,norm,float", # 61.9 s
+    "1,1,GUROBI,norm,float", # 12.3 s
+    # "1,1,MOSEK,norm,float", # can not support vgg16
+    # "1,1,SCS,norm,float", # can not support vgg16
     # "1,1,ECOS_BB,norm,integer", # time-consuming
-    "1,1,GUROBI,norm,integer",
+    "1,1,GUROBI,norm,integer", # 250 s
     # "1,1,MOSEK,norm,integer", # time-consuming
-    "1,1,CBC,max,float",
-    "1,1,COPT,max,float",
-    "1,1,ECOS,max,float",
-    "1,1,ECOS_BB,max,float",
-    "1,1,GLPK,max,float",
-    "1,1,GLPK_MI,max,float",
-    "1,1,GUROBI,max,float",
-    "1,1,MOSEK,max,float",
-    "1,1,SCIPY,max,float",
-    "1,1,CBC,max,integer",
-    "1,1,COPT,max,integer",
+    "1,1,CBC,max,float", # 50.4 s
+    "1,1,COPT,max,float", # 1.28 s
+    "1,1,ECOS,max,float", # 36.3 s
+    "1,1,ECOS_BB,max,float", # 36.3 s
+    # "1,1,GLPK,max,float", # 4646 s # time-consuming
+    # "1,1,GLPK_MI,max,float", # 1248 s # time-consuming
+    "1,1,GUROBI,max,float", # 4.1 s
+    "1,1,MOSEK,max,float", # 8.5 s
+    "1,1,SCIPY,max,float", # 0.8 s
+    "1,1,CBC,max,integer", # 115 s
+    "1,1,COPT,max,integer", # 22.5 s
     # "1,1,ECOS_BB,max,integer", # time-consuming
-    "1,1,GLPK_MI,max,integer",
-    "1,1,GUROBI,max,integer",
-    "1,1,MOSEK,max,integer",
+    # "1,1,GLPK_MI,max,integer", # 1248 s # time-consuming
+    "1,1,GUROBI,max,integer", # 5.7 s
+    "1,1,MOSEK,max,integer", # 7.9 s
 ]
 
-@pytest.mark.parametrize("config, task", [("datas/cifar_base.yaml", "/home/sunhanbo/nfs/mnsim_noc_date/datas/cifar_alexnet.pkl")])
-# @pytest.mark.parametrize("config, task", [("examples/test.yaml", "examples/test.pkl")])
+# @pytest.mark.parametrize("config, task", [("datas/cifar_base.yaml", "/home/sunhanbo/nfs/mnsim_noc_date/datas/cifar_resnet18.pkl")])
+@pytest.mark.parametrize("config, task", [("examples/test.yaml", "examples/test.pkl")])
 @pytest.mark.parametrize("solver_config", solver_config_list)
 def test_schedule(config, task, solver_config):
     """
