@@ -392,6 +392,7 @@ class WireNet(Component):
         start_node, end_node = _get_position_key(start_position), _get_position_key(end_position)
         frontier = _MyQueue(self.tile_net_shape[0] * self.tile_net_shape[1])
         came_from = dict()
+        came_from[start_node] = None
         # get the node with highest priority
         frontier.put(start_node)
         while not frontier.empty():

@@ -31,10 +31,37 @@ from mnsim_noc.Strategy import Schedule
 from mnsim_noc.utils.yaml_io import read_yaml
 from mnsim_noc.utils.linear_programming import ScheduleLinearProgramming
 
-# @pytest.mark.parametrize("config, task", [("datas/cifar_base.yaml", "/home/sunhanbo/nfs/mnsim_noc_date/datas/.pkl")])
-@pytest.mark.parametrize("config, task", [("examples/test.yaml", "examples/test.pkl")])
-@pytest.mark.parametrize("solver", cp.installed_solvers())
-def test_schedule(config, task, solver):
+solver_config_list = [
+    "1,1,COPT,norm,float",
+    "1,1,ECOS,norm,float",
+    "1,1,ECOS_BB,norm,float",
+    "1,1,GUROBI,norm,float",
+    "1,1,MOSEK,norm,float",
+    "1,1,SCS,norm,float",
+    # "1,1,ECOS_BB,norm,integer", # time-consuming
+    "1,1,GUROBI,norm,integer",
+    # "1,1,MOSEK,norm,integer", # time-consuming
+    "1,1,CBC,max,float",
+    "1,1,COPT,max,float",
+    "1,1,ECOS,max,float",
+    "1,1,ECOS_BB,max,float",
+    "1,1,GLPK,max,float",
+    "1,1,GLPK_MI,max,float",
+    "1,1,GUROBI,max,float",
+    "1,1,MOSEK,max,float",
+    "1,1,SCIPY,max,float",
+    "1,1,CBC,max,integer",
+    "1,1,COPT,max,integer",
+    # "1,1,ECOS_BB,max,integer", # time-consuming
+    "1,1,GLPK_MI,max,integer",
+    "1,1,GUROBI,max,integer",
+    "1,1,MOSEK,max,integer",
+]
+
+@pytest.mark.parametrize("config, task", [("datas/cifar_base.yaml", "/home/sunhanbo/nfs/mnsim_noc_date/datas/cifar_alexnet.pkl")])
+# @pytest.mark.parametrize("config, task", [("examples/test.yaml", "examples/test.pkl")])
+@pytest.mark.parametrize("solver_config", solver_config_list)
+def test_schedule(config, task, solver_config):
     """
     test schedule step for each communication
     """
@@ -75,14 +102,14 @@ def test_schedule(config, task, solver):
     # set up the linear programming
     linear_programming = ScheduleLinearProgramming(communication_list, wire_net)
     linear_programming.B[:,0] = linear_programming.B[:,0] / 4
-    linear_programming.solver = solver
+    linear_programming.SOLVER_CONFIG = solver_config
     linear_programming.solve()
     comm_schedule_info_list = linear_programming.parse_x(linear_programming.optimal_x)
     # show the result communication info
     print("-"*20)
     print(f"the optimal total transfer cost is {linear_programming.optimal_obj_total_transfer_cost}")
     optimal_value2 = linear_programming.optimal_obj_single_wire
-    optimal_value2 = optimal_value2[np.abs(optimal_value2) < linear_programming.epsilon]
+    optimal_value2 = optimal_value2[np.abs(optimal_value2) >= linear_programming.epsilon]
     print(f"the optimal single wire is: {optimal_value2}")
     print(f"the optimal object value is {linear_programming.optimal_obj_in_total}")
     for comm_id, comm_schedule_info in enumerate(comm_schedule_info_list):

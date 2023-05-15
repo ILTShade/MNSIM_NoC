@@ -35,6 +35,7 @@ class ScheduleLinearProgramming(Component):
     """
     REGISTRY = "schedule_linear_programming"
     NAME = "schedule_linear_programming"
+    SOLVER_CONFIG = "1,1,GUROBI,norm,float"
     def __init__(self, communication_list: List[BaseCommunication], wire_net: WireNet):
         """
         init the linear programming based on the communication list and wire net
@@ -43,7 +44,7 @@ class ScheduleLinearProgramming(Component):
         # set up the params
         self.communication_list = communication_list
         self.wire_net = wire_net
-        self.epsilon = 1e-5
+        self.epsilon = 0.
         self._set_up_params(communication_list, wire_net)
 
     def _set_up_params(self, communication_list: List[BaseCommunication], wire_net: WireNet):
@@ -111,7 +112,6 @@ class ScheduleLinearProgramming(Component):
         assert (np.matmul(EP.T, np.ones(shape=(E_extra, 1))) == np.ones(shape=(E, 1))).all(), \
             "the sum of equivalent path column must be 1"
         # transfer to the self members
-        self.alpha, self.beta = 1, 1
         self.C, self.V = Cost, Value
         self.EP = EP
         self.A, self.B = A, B
@@ -122,17 +122,50 @@ class ScheduleLinearProgramming(Component):
         self.edge_index_dict = edge_index_dict
         self.logger.info("set up the params for the linear programming successfully")
 
+    def _parse_solver_config(self, solver_config):
+        """
+        solver config is str, in format of "1,1,GUROBI,norm,integer"
+        the first two are the value of alpha and beta
+        the third is type of the solver
+        the fourth denote the type of the objective target, norm or max
+        the fifth denote the type of the variable, integer or continuous
+        """
+        solver_config = solver_config.split(",")
+        assert len(solver_config) == 5, \
+            "the solver config must be in format of '1,1,GUROBI,norm,integer'"
+        self.alpha, self.beta = float(solver_config[0]), float(solver_config[1])
+        self.solver = solver_config[2]
+        assert solver_config[3] in ["norm", "max"], \
+            "the objective target must be norm or max"
+        self.objective_target = solver_config[3]
+        assert solver_config[4] in ["integer", "float"], \
+            "the variable type must be integer or float"
+        self.variable_type = solver_config[4]
+        self.logger.info("parse the solver config successfully")
+        self.logger.info(
+            f"alpha: {self.alpha}, beta: {self.beta}, solver: {self.solver}, " + \
+            f"objective_target: {self.objective_target}, variable_type: {self.variable_type}"
+        )
+
     def solve(self):
         """
         solve the linear programming
         """
+        # parse the solver config
+        self._parse_solver_config(self.SOLVER_CONFIG)
         # define the variables
         self.logger.info("start solving the linear programming...")
-        X = cp.Variable(shape=(self.E, self.K))
+        if self.variable_type == "integer":
+            X = cp.Variable(shape=(self.E, self.K), integer=True)
+        else:
+            X = cp.Variable(shape=(self.E, self.K))
         # define two obj and constraints
         obj1 = cp.matmul(self.C.T, cp.matmul(X, self.V))
         obj2 = cp.matmul(self.EP, cp.matmul(X, self.V))
-        obj_total = self.alpha * obj1 + self.beta * cp.norm2(obj2)
+        if self.objective_target == "norm":
+            obj_total = self.alpha * obj1 + self.beta * cp.norm2(obj2)
+        else:
+            obj_total = self.alpha * obj1 + self.beta * cp.max(obj2)
         constraints = [self.A @ X == self.B, X >= 0]
         # define and solve the problem
         Problem = cp.Problem(cp.Minimize(obj_total), constraints)
@@ -156,9 +189,11 @@ class ScheduleLinearProgramming(Component):
         the order is the same as the input communication list
         X is in shape (E, K)
         """
+        # get my X and the epsilon
+        self.epsilon = np.min(np.max(self.B, axis=0)) * 1e-2
         MyX = copy.deepcopy(X)
         # check for the input X
-        assert np.min(MyX) > -self.epsilon, \
+        assert np.min(MyX) > - self.epsilon, \
             "the input X is not correct, must all be non-negative"
         assert ((np.matmul(self.A, MyX) - self.B) < self.epsilon).all(), \
             "the input X is not correct, A@X == B"
@@ -230,6 +265,6 @@ class ScheduleLinearProgramming(Component):
             assert all([abs(x) < self.epsilon for x in MyX[:, k]]), \
                 "the communication is not finished, some value is not 0"
             # 4 for there are 4 edges at most
-            assert -self.epsilon < all_transfer_data_amount < 4 * self.epsilon, \
+            assert -4 * self.epsilon < all_transfer_data_amount < 4 * self.epsilon, \
                 "the communication is not finished, the all_transfer_data_amount is not 0"
         return communication_schedule_info_list
