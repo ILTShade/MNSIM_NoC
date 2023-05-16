@@ -169,7 +169,7 @@ class ScheduleLinearProgramming(Component):
         constraints = [self.A @ X == self.B, X >= 0]
         # define and solve the problem
         Problem = cp.Problem(cp.Minimize(obj_total), constraints)
-        Problem.solve(solver=self.solver, verbose=True)
+        Problem.solve(solver=self.solver, verbose=False)
         # check the status
         assert Problem.status == cp.OPTIMAL, \
             "the linear programming is not solved successfully"
@@ -178,9 +178,9 @@ class ScheduleLinearProgramming(Component):
         self.optimal_obj_total_transfer_cost = obj1.value[0][0]
         self.optimal_obj_single_wire = obj2.value[:,0]
         self.optimal_obj_in_total = Problem.value
-        self.logger.info(f"the optimal total transfer cost is: {self.optimal_obj_total_transfer_cost}")
-        self.logger.info(f"the optimal single wire is: {self.optimal_obj_single_wire}")
-        self.logger.info("the optimal objective value is: ", self.optimal_obj_in_total)
+        # self.logger.info(f"the optimal total transfer cost is: {self.optimal_obj_total_transfer_cost}")
+        # self.logger.info(f"the optimal single wire is: {self.optimal_obj_single_wire}")
+        # self.logger.info(f"the optimal objective value is: {self.optimal_obj_in_total}")
         return self.optimal_x
 
     def parse_x(self, X):
@@ -218,6 +218,7 @@ class ScheduleLinearProgramming(Component):
             end_node = _get_position_key(output_tile.position)
             # get the total amount of data need to transfer
             all_transfer_data_amount = self.B[self.node_index_dict[start_node], k]
+            self.epsilon = all_transfer_data_amount * 1e-3
             while True:
                 # check for if the outputs from the start node
                 start_link_edge = _get_edge_index_based_node(start_node)
@@ -257,12 +258,12 @@ class ScheduleLinearProgramming(Component):
                     edge_index = self.edge_index_dict[edge_desc]
                     MyX[edge_index, k] -= max_cost
                 # add to the communication schedule info
-                communication_schedule_info_list[k].append((
+                communication_schedule_info_list[k].append([
                     [self.mapping_dict[v] for v in path], max_cost
-                ))
+                ])
                 all_transfer_data_amount -= max_cost
             # check for if the communication is finished
-            assert all([abs(x) < self.epsilon for x in MyX[:, k]]), \
+            assert all([abs(x) < 4 * self.epsilon for x in MyX[:, k]]), \
                 "the communication is not finished, some value is not 0"
             # 4 for there are 4 edges at most
             assert -4 * self.epsilon < all_transfer_data_amount < 4 * self.epsilon, \

@@ -12,6 +12,8 @@
 import abc
 import math
 from mnsim_noc.utils.component import Component
+from mnsim_noc.utils.linear_programming import ScheduleLinearProgramming
+from mnsim_noc.Wire.wire_net import _get_map_key
 
 class Schedule(Component):
     """
@@ -26,14 +28,44 @@ class Schedule(Component):
         # naive for X-Y without through the border
         # adaptive for X-Y with through the border when torus
         # when the noc topology is mesh, there should be no diff in naive and adaptive
-        # assert self.path_generator in ["naive", "adaptive", "dijkstra"], \
-            # "path generator should be naive, adaptive, dijkstra"
         # init hyper parameter
-        self.max_len_ratio = 1.8
-        self.branch_preset = 2
-        self.logger.info(
-            f"The ratio is {self.max_len_ratio}, and the branch preset is {self.branch_preset}"
-        )
+        # check for the path generator in DynamicPath and DynamicAll
+        if isinstance(self, DynamicPathSchedule):
+            self.max_len_ratio = 1.8
+            self.branch_preset = 2
+            self.logger.info(
+                f"The ratio is {self.max_len_ratio}, and the branch preset is {self.branch_preset}"
+            )
+            assert self.path_generator in ["greedy", "dijkstra", "astar"], \
+                "path generator should be greedy, dijkstra, astar for DynamicPathSchedule"
+        # check for the path generator if starts with "cvxopt@" in LinearProgrammingSchedule
+        if self.path_generator.startswith("cvxopt@"):
+            # the path generator is in format of cvxopt@1,1,GUROBI,norm,float
+            # first step, init the linear solver
+            self.linear_solver = ScheduleLinearProgramming(
+                self.communication_list, self.wire_net
+            )
+            # second step, set config and solve the problem
+            solver_config = self.path_generator.split("@")[1]
+            self.linear_solver.SOLVER_CONFIG = solver_config
+            self.linear_solver.solve()
+            self.logger.info(
+                f"the optimal total transfer cost is {self.linear_solver.optimal_obj_total_transfer_cost}"
+            )
+            comm_schedule_ifo_list = self.linear_solver.parse_x(self.linear_solver.optimal_x)
+            # last step, set the communication schedule into the wire net
+            assert len(comm_schedule_ifo_list) == len(self.communication_list), \
+                "communication schedule info list length is not equal to communication list length"
+            for comm_schedule_info, comm in zip(comm_schedule_ifo_list, self.communication_list):
+                start_position = comm.input_tile.position
+                end_position = comm.output_tile.position
+                cache_key = _get_map_key((start_position, end_position))
+                self.wire_net.cvxopt_cache_dict[cache_key] = comm_schedule_info
+                self.wire_net.cvxopt_index_cache[cache_key] = dict()
+            self.wire_net._cvxopt_sort_dict()
+            # finally
+            self.logger.info("the communication schedule is set into the wire net")
+            self.path_generator = "cvxopt"
 
     @abc.abstractmethod
     def _get_transfer_path_list(self, communication_ready_flag, current_time):
@@ -90,6 +122,14 @@ class NaiveSchedule(Schedule):
                 self.communication_list[index].set_communication_task(
                     current_time, transfer_path_list[index], transfer_time_list[index]
                 )
+                # update if the path generator is cvxopt
+                if self.path_generator == "cvxopt":
+                    self.wire_net._cvxopt_update_cache(
+                        self.communication_list[index].input_tile.position,
+                        self.communication_list[index].output_tile.position,
+                        transfer_path_list[index],
+                        self.communication_list[index].transfer_data
+                    )
                 # add to list
                 task_comm_id_list.append(index)
         return task_comm_id_list

@@ -10,12 +10,13 @@
     2022/05/07 17:20
 """
 import copy
-from queue import PriorityQueue
+# from queue import PriorityQueue
 
 import numpy as np
 
 from mnsim_noc.utils.component import Component
 from mnsim_noc.Wire.base_wire import BaseWire
+from mnsim_noc.Buffer.base_buffer import get_data_size
 
 
 def _get_map_key(wire_position):
@@ -191,6 +192,8 @@ class WireNet(Component):
         # cache
         self.xy_cache_dict = dict()
         self.adaptive_cache_dict = dict()
+        self.cvxopt_cache_dict = dict()
+        self.cvxopt_index_cache = dict()
 
     def _init_adjacency_dict(self, wires_topology):
         """
@@ -502,6 +505,55 @@ class WireNet(Component):
             start_position, end_position, self.adjacency_dict, self._heuristic_distance
         )
 
+    def _cvxopt_routing_path(self, start_position, end_position):
+        """
+        find the data path based on the cvxopt cache dict
+        """
+        cache_key = _get_map_key((start_position, end_position))
+        for schedule_info in self.cvxopt_cache_dict[cache_key]:
+            # filter the run out path
+            if schedule_info[1] <= 0:
+                continue
+            # filter the invalid path
+            if self.get_data_path_state(schedule_info[0]):
+                continue
+            return schedule_info[0]
+        return None
+
+    def _cvxopt_sort_dict(self):
+        """
+        sort the cvxopt cache dict based on the length and the total data
+        """
+        for cache_key, schedule_info in self.cvxopt_cache_dict.items():
+            # sorted by the total data and length
+            sorted_schedule_info = sorted(schedule_info, key=lambda x: x[1], reverse=True)
+            sorted_schedule_info = sorted(sorted_schedule_info, key=lambda x: len(x[0]))
+            # filter the small data path
+            total_data = sum([s[1] for s in sorted_schedule_info])
+            total_data_thres = total_data * 1e-2
+            sorted_schedule_info = [s for s in sorted_schedule_info if s[1] > total_data_thres]
+            # update the cache dict
+            self.cvxopt_cache_dict[cache_key] = sorted_schedule_info
+
+    def _cvxopt_update_cache(self, start_position, end_position, transfer_path, transfer_data):
+        """
+        update the cvxopt cache dict
+        """
+        cache_key = _get_map_key((start_position, end_position))
+        transfer_path_key = str(transfer_path)
+        transfer_total_data = sum([get_data_size(p) for p in transfer_data])
+        # get the index
+        if transfer_path_key not in self.cvxopt_index_cache[cache_key]:
+            for index, schedule_info in enumerate(self.cvxopt_cache_dict[cache_key]):
+                if schedule_info[0] == transfer_path:
+                    self.cvxopt_index_cache[cache_key][transfer_path_key] = index
+                    break
+            else:
+                assert False, "transfer path not in cvxopt cache dict"
+        # update the data
+        transfer_index = self.cvxopt_index_cache[cache_key][transfer_path_key]
+        self.cvxopt_cache_dict[cache_key][transfer_index][1] -= transfer_total_data
+
     def find_data_path_cate(self, start_position, end_position, cate):
         """
         find the data path from start_position to end_position_list
@@ -526,6 +578,8 @@ class WireNet(Component):
             return self._dijkstra_routing_path(start_position, end_position)
         if cate == "astar":
             return self._astar_routing_path(start_position, end_position)
+        if cate == "cvxopt":
+            return self._cvxopt_routing_path(start_position, end_position)
         raise ValueError(f"cate should be support cates but get {cate}")
 
     def set_transparent_flag(self, transparent_flag):
@@ -574,6 +628,9 @@ class WireNet(Component):
         """
         check if all wires are idle
         """
+        # check if the cvxopt is already
+        for cache_key, schedule_info in self.cvxopt_cache_dict.items():
+            residual = sum([s[1] for s in schedule_info])
         for wire in self.wires:
             assert wire.get_wire_state() is False
 

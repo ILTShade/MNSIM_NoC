@@ -24,10 +24,8 @@ import pickle
 
 import pytest
 import numpy as np
-import cvxpy as cp
 
 from mnsim_noc.Array import BaseArray
-from mnsim_noc.Strategy import Schedule
 from mnsim_noc.utils.yaml_io import read_yaml
 from mnsim_noc.utils.linear_programming import ScheduleLinearProgramming
 
@@ -101,7 +99,6 @@ def test_schedule(config, task, solver_config):
     wire_net.set_transparent_flag(transparent_flag)
     # set up the linear programming
     linear_programming = ScheduleLinearProgramming(communication_list, wire_net)
-    linear_programming.B[:,0] = linear_programming.B[:,0] / 4
     linear_programming.SOLVER_CONFIG = solver_config
     linear_programming.solve()
     comm_schedule_info_list = linear_programming.parse_x(linear_programming.optimal_x)
