@@ -531,7 +531,8 @@ class WireNet(Component):
             # filter the small data path
             total_data = sum([s[1] for s in sorted_schedule_info])
             total_data_thres = total_data * 1e-2
-            sorted_schedule_info = [s for s in sorted_schedule_info if s[1] > total_data_thres]
+            residual_data = sum([s[1] for s in sorted_schedule_info if s[1] < total_data_thres])
+            schedule_info[0][1] += residual_data
             # update the cache dict
             self.cvxopt_cache_dict[cache_key] = sorted_schedule_info
 

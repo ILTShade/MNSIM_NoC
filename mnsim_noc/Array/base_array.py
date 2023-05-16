@@ -239,7 +239,8 @@ class BaseArray(Component):
             # self.logger.info(f"total running rate: {rate_sum}")
         # save for the output
         output_list = np.array(output_list)
-        file_name = f"output_info_{self.task_name_label}.txt"
+        file_name = f"output_info_{self.task_name_label}" + \
+            f"_{self.mapping_strategy.NAME}_{self.schedule_strategy}_{self.path_generator}.txt"
         np.savetxt(file_name, output_list, fmt="%.3f")
         self.logger.info(f"The output info is saved in {file_name}")
         # get min index
